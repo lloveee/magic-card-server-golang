@@ -89,7 +89,11 @@ func buildOpponentView(p *PlayerState) protocol.OpponentView {
 	// 角色暗置：使用技能前显示 "???"
 	charName := "???"
 	if p.CharRevealed && p.CharacterID != "" {
-		charName = p.CharacterID
+		if def, ok := character.Get(p.CharacterID); ok {
+			charName = def.Name
+		} else {
+			charName = p.CharacterID
+		}
 	}
 
 	return protocol.OpponentView{

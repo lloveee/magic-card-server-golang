@@ -588,9 +588,13 @@ func (e *Engine) handleHPZero(seat int) {
 			// 殉道者解放自动触发：HP 回至60，广播解放事件
 			p.HP = 60
 			slog.Info("martyr liberation triggered", "seat", seat)
+			libCharName := p.CharacterID
+			if def, ok := character.Get(p.CharacterID); ok {
+				libCharName = def.Name
+			}
 			e.room.Broadcast(protocol.MsgLiberationEv, protocol.MustEncode(protocol.LiberationEv{
 				PlayerSeat: seat,
-				Character:  p.CharacterID,
+				Character:  libCharName,
 				Desc:       p.Char.Def.Lib.Result.Desc,
 			}))
 			result := p.Char.Def.Lib.Result
@@ -826,9 +830,13 @@ func (e *Engine) handleUseSkill(seat int, payload []byte) {
 	p.CharRevealed = true
 
 	// 广播技能使用事件（公开角色身份）
+	charDisplayName := p.CharacterID
+	if def, ok := character.Get(p.CharacterID); ok {
+		charDisplayName = def.Name
+	}
 	e.room.Broadcast(protocol.MsgSkillUsedEv, protocol.MustEncode(protocol.SkillUsedEv{
 		PlayerSeat: seat,
-		Character:  p.CharacterID,
+		Character:  charDisplayName,
 		SkillLevel: int(result.Tier),
 		Desc:       result.Desc,
 	}))
@@ -864,9 +872,13 @@ func (e *Engine) handleTriggerLiberate(seat int) {
 	result, _ := p.Char.TriggerLiberation() // LibUsed 在此内部标记
 	p.CharRevealed = true
 
+	libName := p.CharacterID
+	if def, ok := character.Get(p.CharacterID); ok {
+		libName = def.Name
+	}
 	e.room.Broadcast(protocol.MsgLiberationEv, protocol.MustEncode(protocol.LiberationEv{
 		PlayerSeat: seat,
-		Character:  p.CharacterID,
+		Character:  libName,
 		Desc:       result.Desc,
 	}))
 
