@@ -36,10 +36,10 @@ func TestCombine_SameMajor_Multiplies(t *testing.T) {
 		ingr   *card.Card
 		want   int
 	}{
-		{"梦境攻击×梦境技能 2×3=6>5截断", atk(card.SubDream, 2), skl(card.SubDream, 3), 5},
+		{"梦境攻击×梦境技能 2×3=6", atk(card.SubDream, 2), skl(card.SubDream, 3), 6},
 		{"梦境攻击×梦境技能 2×2=4", atk(card.SubDream, 2), skl(card.SubDream, 2), 4},
 		{"虚幻攻击×虚幻能耗 1×5=5", atk(card.SubIllusion, 1), eng(card.SubIllusion, 5), 5},
-		{"重组攻击×重组技能 3×2=6>5截断", atk(card.SubReform, 3), skl(card.SubReform, 2), 5},
+		{"重组攻击×重组技能 3×2=6", atk(card.SubReform, 3), skl(card.SubReform, 2), 6},
 	}
 
 	for _, tc := range cases {
@@ -72,7 +72,7 @@ func TestCombine_DifferentMajor_Adds(t *testing.T) {
 		want int
 	}{
 		{"梦境攻击+轮回技能 2+3=5", atk(card.SubDream, 2), skl(card.SubReincarnation, 3), 5},
-		{"虚幻攻击+重组技能 3+4=7>5截断", atk(card.SubIllusion, 3), skl(card.SubReform, 4), 5},
+		{"虚幻攻击+重组技能 3+4=7", atk(card.SubIllusion, 3), skl(card.SubReform, 4), 7},
 		{"梦境技能+重组攻击 1+1=2", skl(card.SubDream, 1), atk(card.SubReform, 1), 2},
 	}
 
@@ -134,7 +134,7 @@ func TestCombine_AllowSameType_SameMajorMultiplies(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.AllowSameType = true
 
-	// 同大系同类型：2×3=6 → 截断到5
+	// 同大系同类型：2×3=6（无上限）
 	base := atk(card.SubDream, 2)
 	ingr := atk(card.SubIllusion, 3)
 
@@ -142,8 +142,8 @@ func TestCombine_AllowSameType_SameMajorMultiplies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Points != 5 {
-		t.Errorf("points = %d, want 5", result.Points)
+	if result.Points != 6 {
+		t.Errorf("points = %d, want 6", result.Points)
 	}
 }
 
@@ -172,7 +172,7 @@ func TestCombine_IllusionBonus_NoCapForNonIllusion(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.IllusionBonus = true
 
-	// base 是梦境牌（非虚幻），上限仍为5：3×3=9 → 5
+	// base 是梦境牌（非虚幻），IllusionBonus 不生效，无上限：3×3=9
 	base := atk(card.SubDream, 3)
 	ingr := skl(card.SubDream, 3)
 
@@ -180,8 +180,8 @@ func TestCombine_IllusionBonus_NoCapForNonIllusion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Points != 5 {
-		t.Errorf("non-illusion base: points = %d, want 5", result.Points)
+	if result.Points != 9 {
+		t.Errorf("non-illusion base: points = %d, want 9", result.Points)
 	}
 }
 
