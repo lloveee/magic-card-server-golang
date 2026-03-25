@@ -228,6 +228,16 @@ type GameOverEv struct {
 	Reason     string `json:"reason"` // "hp_zero" / "secret_realm_highest_hp"
 }
 
+// ClientPingReq C→S 客户端主动延迟探测，携带发送时刻的毫秒时间戳。
+type ClientPingReq struct {
+	TS int64 `json:"ts"`
+}
+
+// ClientPingResp S→C 原样回显客户端时间戳，客户端用 (now - ts) 计算 RTT。
+type ClientPingResp struct {
+	TS int64 `json:"ts"`
+}
+
 // TurnTimerEv S→C 行动倒计时通知，每秒推送一次，行动阶段结束后停止。
 type TurnTimerEv struct {
 	ActiveSeat  int `json:"active_seat"`  // 当前行动方

@@ -19,6 +19,9 @@ const (
 	MsgPing uint16 = 1 // S→C 心跳探测
 	MsgPong uint16 = 2 // C→S 心跳响应
 
+	MsgClientPingReq  uint16 = 3 // C→S 客户端主动 RTT 探测（含发送时间戳）
+	MsgClientPingResp uint16 = 4 // S→C 回显客户端时间戳，供客户端计算延迟
+
 	// ── 认证 ──────────────────────────────────────────────
 	MsgLoginReq  uint16 = 1001 // C→S 登录
 	MsgLoginResp uint16 = 1002 // S→C 登录结果

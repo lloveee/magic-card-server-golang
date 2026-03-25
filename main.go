@@ -8,6 +8,7 @@ import (
 	"echo/internal/matchmaking"
 	"echo/internal/network"
 	"echo/internal/player"
+	"echo/internal/protocol"
 	"echo/internal/room"
 )
 
@@ -32,6 +33,11 @@ func main() {
 	// 匹配层：登录、入队、退队
 	mmHandler := matchmaking.NewHandler(playerMgr, queue, roomMgr)
 	mmHandler.RegisterAll(router)
+
+	// 系统层：客户端 RTT 探测（原样回显时间戳）
+	router.Register(protocol.MsgClientPingReq, func(s *network.Session, data []byte) {
+		s.Send(protocol.MsgClientPingResp, data)
+	})
 
 	// 游戏层：角色选择、行动阶段所有操作
 	gameHandler := game.NewHandler(playerMgr, roomMgr)
