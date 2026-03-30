@@ -13,11 +13,14 @@ import "errors"
 type CharInstance struct {
 	Def *CharDef
 
-	// LibUsed：解放技能是否已触发过（每局只能触发一次）
+	// LibUsed：解放技能是否已触发过（LibRepeatable=true 时此字段不阻止再次触发）
 	LibUsed bool
 
 	// InterceptUsed：殉道者被动"二次死亡拦截"是否已用过
 	InterceptUsed bool
+
+	// ExtraState：角色特定的跨阶段持久状态（钩子函数用）
+	ExtraState map[string]any
 }
 
 // NewInstance 根据角色 ID 创建运行时实例。
@@ -27,20 +30,30 @@ func NewInstance(charID string) (*CharInstance, error) {
 	if !ok {
 		return nil, errors.New("未知角色 ID: " + charID)
 	}
-	return &CharInstance{Def: def}, nil
+	return &CharInstance{
+		Def:        def,
+		ExtraState: make(map[string]any),
+	}, nil
 }
 
 // ════════════════════════════════════════════════════════════════
 //  技能激活
 // ════════════════════════════════════════════════════════════════
 
-// UseSkill 根据技能牌点数决定激活普通技能还是强化技能。
+// UseSkill 根据技能牌点数决定激活哪个档位的技能。
 // 返回：(技能结果, 能量消耗, 错误)
 //
-// 判定规则：
+// 优先检查 Hooks.UseSkillOverride；若未处理则回退默认逻辑：
 //   cardPoints ≤ 2 → TierNormal
 //   cardPoints ≥ 3 → TierEnhanced
 func (ci *CharInstance) UseSkill(cardPoints int) (*SkillResult, int, error) {
+	// 先尝试钩子覆盖
+	if ci.Def.Hooks != nil && ci.Def.Hooks.UseSkillOverride != nil {
+		if result, cost, handled := ci.Def.Hooks.UseSkillOverride(cardPoints, ci.ExtraState); handled {
+			return result, cost, nil
+		}
+	}
+	// 默认档位逻辑
 	var skill SkillDef
 	if cardPoints <= 2 {
 		skill = ci.Def.Normal
@@ -52,20 +65,30 @@ func (ci *CharInstance) UseSkill(cardPoints int) (*SkillResult, int, error) {
 }
 
 // TriggerLiberation 触发解放技能。
-// 若已触发过，返回错误；触发后标记 LibUsed=true。
+// LibRepeatable=true 时可重复触发；否则每局只能触发一次。
 // 能量消耗由调用方（engine）在调用前检查并扣除。
 func (ci *CharInstance) TriggerLiberation() (*SkillResult, error) {
-	if ci.LibUsed {
+	repeatable := ci.Def.Hooks != nil && ci.Def.Hooks.LibRepeatable
+	if ci.LibUsed && !repeatable {
 		return nil, errors.New("解放技能每局只能使用一次")
 	}
-	ci.LibUsed = true
+	if !repeatable {
+		ci.LibUsed = true
+	}
 	result := ci.Def.Lib.Result // 值拷贝
 	return &result, nil
 }
 
-// CanLiberate 检查是否可以手动触发解放（未用过 + 能量足够）。
+// CanLiberate 检查是否可以手动触发解放（能量足够，且若不可重复则未用过）。
 func (ci *CharInstance) CanLiberate(energy int) bool {
-	return !ci.LibUsed && energy >= ci.Def.LibThreshold
+	if ci.Def.LibThreshold <= 0 {
+		return false // 阈值为 0 表示该角色不使用传统解放按钮
+	}
+	repeatable := ci.Def.Hooks != nil && ci.Def.Hooks.LibRepeatable
+	if !repeatable && ci.LibUsed {
+		return false
+	}
+	return energy >= ci.Def.LibThreshold
 }
 
 // ════════════════════════════════════════════════════════════════

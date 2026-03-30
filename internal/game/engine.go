@@ -158,6 +158,15 @@ func (e *Engine) waitCharacterSelect() bool {
 			p.HP = inst.Def.MaxHP
 			p.MaxEnergy = inst.Def.MaxEnergy
 			p.LibThreshold = inst.Def.LibThreshold
+			// Hooks 可覆盖初始 HP/能量（如时空裂缝者：MaxHP=150 但初始 60）
+			if inst.Def.Hooks != nil {
+				if inst.Def.Hooks.InitHP > 0 {
+					p.HP = inst.Def.Hooks.InitHP
+				}
+				if inst.Def.Hooks.InitEnergy > 0 {
+					p.Energy = inst.Def.Hooks.InitEnergy
+				}
+			}
 			selected[act.Seat] = true
 			slog.Info("character selected", "seat", act.Seat, "char", req.CharacterID)
 
@@ -178,6 +187,7 @@ func (e *Engine) waitCharacterSelect() bool {
 // runFieldDraw 第2回合起抽取场地效果，通知双方。
 func (e *Engine) runFieldDraw() {
 	e.state.Phase = PhaseFieldDraw
+	e.callPhaseStartHooks(string(PhaseFieldDraw))
 	e.state.FieldEffect = field.Draw(e.rng)
 	slog.Info("field effect drawn",
 		"gameID", e.state.GameID,
@@ -190,6 +200,7 @@ func (e *Engine) runFieldDraw() {
 // runDraw 补牌阶段：每位玩家补至8张（濒死补至4张）。
 func (e *Engine) runDraw() {
 	e.state.Phase = PhaseDraw
+	e.callPhaseStartHooks(string(PhaseDraw))
 	e.broadcastPhaseChange()
 	e.doDraw()
 
@@ -216,6 +227,7 @@ func (e *Engine) doDraw() {
 // 返回 false 表示 ctx 被取消（服务器关闭），应退出 run()。
 func (e *Engine) runAction() bool {
 	e.state.Phase = PhaseAction
+	e.callPhaseStartHooks(string(PhaseAction))
 	e.state.ActiveSeat = 0 // Seat 0 先手
 	e.state.Players[0].ActionDone = false
 	e.state.Players[1].ActionDone = false
@@ -387,13 +399,37 @@ func (e *Engine) handlePlayCard(seat int, payload []byte) {
 		return
 	}
 
-	switch c.CardType {
+	// 万能者被动：所有牌均视为攻击牌（优先级高于场地效果）
+	effectiveType := c.CardType
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.AllCardsAsAttack {
+		effectiveType = card.TypeAttack
+	}
+
+	switch effectiveType {
 	case card.TypeAttack:
 		// 攻击牌：即时结算（三国杀式），打出后对手进入防御窗口
 		attackPoints := c.Points
+		// 1. 牌面点数修正（角色被动，如血魔 +3、万能者阶段 2 +2）
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.ModifyCardPoints != nil {
+			attackPoints = p.Char.Def.Hooks.ModifyCardPoints(attackPoints, p.Char.ExtraState)
+		}
+		// 2. BonusOutgoing 被动（主角色 + 赐福角色）
 		attackPoints = e.applyOutgoing(p, attackPoints)
+		// 3. 场地效果加成
 		if e.state.FieldEffect != nil {
 			attackPoints += e.state.FieldEffect.BonusAttack
+		}
+		// 4. 自定义结算总和修正（万能者阶段加成、血魔下次攻击加成）
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.ModifyOutgoingAttack != nil {
+			attackPoints = p.Char.Def.Hooks.ModifyOutgoingAttack(attackPoints, p.Energy, p.Char.ExtraState)
+		}
+		// 5. OnAttackLaunched：时空裂缝者消耗超量能量强化攻击
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.OnAttackLaunched != nil {
+			extra, spent := p.Char.Def.Hooks.OnAttackLaunched(attackPoints, p.Energy, p.Char.ExtraState)
+			if spent > 0 {
+				e.loseEnergy(seat, spent)
+			}
+			attackPoints += extra
 		}
 		defSeat := 1 - seat
 		e.state.PendingAttack = &PendingAttack{AttackerSeat: seat, AttackPoints: attackPoints}
@@ -408,12 +444,12 @@ func (e *Engine) handlePlayCard(seat int, payload []byte) {
 	case card.TypeEnergy:
 		// 能耗牌：转化为能量
 		gained := c.Points
-		p.Energy = min(p.Energy+gained, p.MaxEnergy)
+		e.gainEnergy(seat, gained)
 		slog.Info("energy gained", "seat", seat, "gained", gained, "total", p.Energy)
 		e.sendPlayerStatus(seat)
 		e.sendStateTo(seat, "energy card played") // 更新手牌区（移除已打出的能耗牌）
 
-		// 能量达到解放阈值时通知（Phase 7 处理实际触发逻辑）
+		// 能量达到解放阈值时通知
 		if p.Energy >= p.LibThreshold {
 			slog.Info("liberation threshold reached", "seat", seat, "energy", p.Energy)
 		}
@@ -487,6 +523,7 @@ func (e *Engine) handleSynthesize(seat int, payload []byte) {
 // 三国杀式即时结算：攻击已在行动阶段逐一结算，此阶段仅作阶段标记。
 func (e *Engine) runCombat() {
 	e.state.Phase = PhaseCombat
+	e.callPhaseStartHooks(string(PhaseCombat))
 	e.broadcastPhaseChange()
 	e.broadcastState("combat phase")
 }
@@ -511,7 +548,7 @@ func (e *Engine) handleDefenseAction(seat int, payload []byte) {
 	if req.Pass {
 		// 放弃防御：承受全部伤害
 		slog.Info("defense passed", "seat", seat, "damage", attackPoints)
-		e.applyDamage(seat, attackPoints, "攻击牌伤害")
+		e.applyDamageFull(atkSeat, seat, attackPoints, "攻击牌伤害")
 		e.broadcastState("defense passed")
 		return
 	}
@@ -526,13 +563,13 @@ func (e *Engine) handleDefenseAction(seat int, payload []byte) {
 		defCard, err = p.Hand.TakeSynth(req.Slot)
 	default:
 		// 区域非法，回退到 Pass 处理
-		e.applyDamage(seat, attackPoints, "攻击牌伤害")
+		e.applyDamageFull(atkSeat, seat, attackPoints, "攻击牌伤害")
 		e.broadcastState("defense invalid zone, treated as pass")
 		return
 	}
 	if err != nil || defCard == nil {
 		// 槽位无牌，同 Pass 处理
-		e.applyDamage(seat, attackPoints, "攻击牌伤害")
+		e.applyDamageFull(atkSeat, seat, attackPoints, "攻击牌伤害")
 		e.broadcastState("defense card missing, treated as pass")
 		return
 	}
@@ -543,13 +580,14 @@ func (e *Engine) handleDefenseAction(seat int, payload []byte) {
 		"atkPoints", attackPoints, "remaining", remaining)
 
 	if remaining > 0 {
-		e.applyDamage(seat, remaining, "攻击牌伤害（防御后剩余）")
+		e.applyDamageFull(atkSeat, seat, remaining, "攻击牌伤害（防御后剩余）")
 	}
 	e.broadcastState("defense resolved")
 }
 
-// applyDamage 对目标玩家造成伤害，处理濒死逻辑，推送伤害事件。
-func (e *Engine) applyDamage(targetSeat, amount int, detail string) {
+// applyDamageFull 对目标玩家造成伤害，触发完整的伤害钩子链。
+// sourceSeat: 伤害来源座位（与 targetSeat 相同表示自伤；-1 表示环境/无来源）。
+func (e *Engine) applyDamageFull(sourceSeat, targetSeat, amount int, detail string) {
 	p := e.state.Players[targetSeat]
 
 	// 被动：受击方角色减免（主角色 + 赐福第二角色叠加）
@@ -561,11 +599,20 @@ func (e *Engine) applyDamage(targetSeat, amount int, detail string) {
 		finalDamage = p.SecondChar.ModifyIncoming(finalDamage)
 	}
 
+	// HPEnergyShared：受伤时同步扣除能量（不低于 0）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.HPEnergyShared {
+		p.Energy = max(p.Energy-finalDamage, 0)
+	}
+
 	p.HP -= finalDamage
 
+	attackerSeat := sourceSeat
+	if attackerSeat < 0 {
+		attackerSeat = 1 - targetSeat
+	}
 	hpAfter := max(p.HP, 0)
 	e.room.Broadcast(protocol.MsgDamageEv, protocol.MustEncode(protocol.DamageEv{
-		AttackerSeat: 1 - targetSeat,
+		AttackerSeat: attackerSeat,
 		DefenderSeat: targetSeat,
 		RawDamage:    amount,
 		FinalDamage:  finalDamage,
@@ -573,9 +620,36 @@ func (e *Engine) applyDamage(targetSeat, amount int, detail string) {
 		Detail:       detail,
 	}))
 
+	// 钩子：OnDamageReceived（目标方）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.OnDamageReceived != nil {
+		p.Char.Def.Hooks.OnDamageReceived(finalDamage, p.Char.ExtraState)
+	}
+
+	// 钩子：OnDamageDealt / OnDamageLanded（来源方，仅非自伤且来源合法）
+	if sourceSeat >= 0 && sourceSeat != targetSeat {
+		src := e.state.Players[sourceSeat]
+		if src.Char != nil && src.Char.Def.Hooks != nil {
+			if src.Char.Def.Hooks.OnDamageDealt != nil {
+				src.Char.Def.Hooks.OnDamageDealt(finalDamage, src.Char.ExtraState)
+			}
+			if src.Char.Def.Hooks.OnDamageLanded != nil {
+				heal := src.Char.Def.Hooks.OnDamageLanded(finalDamage, src.Char.ExtraState)
+				if heal > 0 {
+					src.HP = min(src.HP+heal, src.MaxHP)
+					e.sendPlayerStatus(sourceSeat)
+				}
+			}
+		}
+	}
+
 	if p.HP <= 0 {
 		e.handleHPZero(targetSeat)
 	}
+}
+
+// applyDamage 对目标玩家造成伤害（无明确来源方，向后兼容接口）。
+func (e *Engine) applyDamage(targetSeat, amount int, detail string) {
+	e.applyDamageFull(-1, targetSeat, amount, detail)
 }
 
 // handleHPZero 处理 HP 归零，实现濒死机制。
@@ -634,6 +708,7 @@ func (e *Engine) triggerDeath(loseSeat int) {
 // runCleanup 清场阶段，返回 true 表示游戏已结束。
 func (e *Engine) runCleanup() bool {
 	e.state.Phase = PhaseCleanup
+	e.callPhaseStartHooks(string(PhaseCleanup))
 	e.broadcastPhaseChange()
 
 	nearDeathDrain := 30
@@ -766,6 +841,57 @@ func (e *Engine) fieldSynthOpts() card.SynthesisOpts {
 	return opts
 }
 
+// gainEnergy 增加玩家能量（不超过 MaxEnergy）。
+// HPEnergyShared 角色同步恢复 HP。
+func (e *Engine) gainEnergy(seat, amount int) {
+	if amount <= 0 {
+		return
+	}
+	p := e.state.Players[seat]
+	newEnergy := min(p.Energy+amount, p.MaxEnergy)
+	gained := newEnergy - p.Energy
+	p.Energy = newEnergy
+	if gained > 0 && p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.HPEnergyShared {
+		p.HP = min(p.HP+gained, p.MaxHP)
+	}
+}
+
+// loseEnergy 消耗玩家能量（不低于 0）。
+// HPEnergyShared 角色同步扣除 HP，可能触发濒死逻辑。
+func (e *Engine) loseEnergy(seat, amount int) {
+	if amount <= 0 {
+		return
+	}
+	p := e.state.Players[seat]
+	newEnergy := max(p.Energy-amount, 0)
+	spent := p.Energy - newEnergy
+	p.Energy = newEnergy
+	if spent > 0 && p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.HPEnergyShared {
+		p.HP -= spent
+		if p.HP <= 0 {
+			e.handleHPZero(seat)
+		}
+	}
+}
+
+// callPhaseStartHooks 在每个阶段开始时对所有玩家触发 OnPhaseStart 钩子。
+func (e *Engine) callPhaseStartHooks(phase string) {
+	for seat, p := range e.state.Players {
+		if p.Char == nil || p.Char.Def.Hooks == nil || p.Char.Def.Hooks.OnPhaseStart == nil {
+			continue
+		}
+		delta, msg := p.Char.Def.Hooks.OnPhaseStart(phase, p.Char.ExtraState)
+		if delta > 0 {
+			e.gainEnergy(seat, delta)
+		} else if delta < 0 {
+			e.loseEnergy(seat, -delta)
+		}
+		if msg != "" {
+			slog.Info("phase start hook", "seat", seat, "phase", phase, "msg", msg)
+		}
+	}
+}
+
 // sendPlayerStatus 向双方推送某玩家 HP/能量的增量更新。
 func (e *Engine) sendPlayerStatus(seat int) {
 	p := e.state.Players[seat]
@@ -812,7 +938,7 @@ func (e *Engine) activateSkillCard(seat int, c *card.Card, putBack func()) bool 
 		e.sendError(seat, protocol.ErrCodeInvalidPhase, "能量不足")
 		return false
 	}
-	p.Energy -= cost
+	e.loseEnergy(seat, cost)
 	p.CharRevealed = true
 
 	charDisplayName := p.CharacterID
@@ -881,7 +1007,7 @@ func (e *Engine) handleTriggerLiberate(seat int) {
 	}
 
 	// 扣除解放所需能量
-	p.Energy -= p.Char.Def.LibThreshold
+	e.loseEnergy(seat, p.Char.Def.LibThreshold)
 
 	result, _ := p.Char.TriggerLiberation() // LibUsed 在此内部标记
 	p.CharRevealed = true
@@ -904,36 +1030,23 @@ func (e *Engine) handleTriggerLiberate(seat int) {
 // 统一处理所有技能效果，避免在各处重复逻辑。
 func (e *Engine) applySkillResult(seat int, result *character.SkillResult) {
 	p := e.state.Players[seat]
-	opp := e.state.Players[1-seat]
 
 	if result.HealSelf > 0 {
 		p.HP = min(p.HP+result.HealSelf, p.MaxHP)
 	}
 	if result.GainEnergy > 0 {
-		p.Energy = min(p.Energy+result.GainEnergy, p.MaxEnergy)
+		e.gainEnergy(seat, result.GainEnergy)
 	}
 	if result.DrawCards > 0 {
 		p.Hand.DrawIntoHand(p.Deck, result.DrawCards)
 	}
 	if result.DealDirectDamage > 0 {
-		// 直接伤害：不走攻击牌路径，仍经过受击方被动减免
-		oppSeat := 1 - seat
-		dmg := result.DealDirectDamage
-		if opp.Char != nil {
-			dmg = opp.Char.ModifyIncoming(dmg)
-		}
-		opp.HP -= dmg
-		e.room.Broadcast(protocol.MsgDamageEv, protocol.MustEncode(protocol.DamageEv{
-			AttackerSeat: seat,
-			DefenderSeat: oppSeat,
-			RawDamage:    result.DealDirectDamage,
-			FinalDamage:  dmg,
-			HPAfter:      max(opp.HP, 0),
-			Detail:       "技能直接伤害",
-		}))
-		if opp.HP <= 0 {
-			e.handleHPZero(oppSeat)
-		}
+		// 直接伤害：不走攻击牌路径，完整钩子链（含减免、OnDamageReceived 等）
+		e.applyDamageFull(seat, 1-seat, result.DealDirectDamage, "技能直接伤害")
+	}
+	if result.DamageSelf > 0 {
+		// 技能自伤：不触发 OnDamageDealt/OnDamageLanded，但触发 OnDamageReceived
+		e.applyDamageFull(seat, seat, result.DamageSelf, "技能自伤")
 	}
 	// 同步状态（能量/HP）
 	e.sendPlayerStatus(seat)

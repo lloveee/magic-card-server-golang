@@ -25,6 +25,7 @@ type SkillResult struct {
 	HealSelf         int    // 为施法者恢复 N 点 HP
 	GainEnergy       int    // 为施法者增加 N 点能量
 	DrawCards        int    // 施法者抽 N 张牌
+	DamageSelf       int    // 施法者自身受到 N 点伤害（血魔等自伤技能用）
 	Desc             string // 面向客户端展示的效果描述（写入 SkillUsedEv.Desc）
 }
 
@@ -68,6 +69,9 @@ type CharDef struct {
 	Normal   SkillDef // 技能牌点数 1-2 触发
 	Enhanced SkillDef // 技能牌点数 3-5 触发
 	Lib      SkillDef // 解放技能
+
+	// Hooks：可选行为钩子，nil 表示使用标准引擎逻辑。
+	Hooks *CharHooks
 }
 
 // ════════════════════════════════════════════════════════════════
