@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"echo/internal/config"
 	"echo/internal/game"
 	"echo/internal/matchmaking"
 	"echo/internal/network"
@@ -16,9 +17,12 @@ import (
 )
 
 func main() {
+	cfg := config.Load()
+
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level: cfg.LogLevel,
 	})))
+	slog.Info("config loaded", "addr", cfg.ListenAddr, "rateLimit", cfg.RateLimit, "turnDuration", cfg.TurnDuration)
 
 	// ── 依赖初始化（顺序有意义，被依赖的先初始化）──────────────
 	playerMgr := player.NewManager()
@@ -53,7 +57,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	srv := network.NewServer("0.0.0.0:43966", router)
+	srv := network.NewServer(cfg.ListenAddr, router)
 	if err := srv.Start(ctx); err != nil {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)
