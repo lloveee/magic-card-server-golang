@@ -1,6 +1,7 @@
 package game
 
 import (
+	"echo/internal/game/card"
 	"echo/internal/game/character"
 	"echo/internal/protocol"
 )
@@ -60,8 +61,15 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 	// 手牌区：完整内容（含槽位编号，客户端用于 UI 排列）
 	for _, sc := range p.Hand.HandSlottedCards() {
 		pts := sc.Card.Points
-		// Phase 6：若场地效果（虚幻之境·实）使该牌点数隐藏，
-		// 对发给自己的视图仍然显示（IsHidden 影响发给对手的视图）
+		// 应用角色牌面点数修正（如万能者阶段2+2、血魔者受伤≥50后+3）
+		// 只对有效攻击牌应用（AllCardsAsAttack 角色对所有牌生效）
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.ModifyCardPoints != nil {
+			effectiveAttack := sc.Card.CardType == card.TypeAttack ||
+				p.Char.Def.Hooks.AllCardsAsAttack
+			if effectiveAttack {
+				pts = p.Char.Def.Hooks.ModifyCardPoints(pts, p.Char.ExtraState)
+			}
+		}
 		view.Hand = append(view.Hand, protocol.CardView{
 			Slot:     sc.Slot,
 			Faction:  sc.Card.SubFaction.String(),
@@ -73,12 +81,39 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 	// 合成区：完整内容
 	for _, sc := range p.Hand.SynthSlottedCards() {
 		pts := sc.Card.Points
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.ModifyCardPoints != nil {
+			effectiveAttack := sc.Card.CardType == card.TypeAttack ||
+				p.Char.Def.Hooks.AllCardsAsAttack
+			if effectiveAttack {
+				pts = p.Char.Def.Hooks.ModifyCardPoints(pts, p.Char.ExtraState)
+			}
+		}
 		view.SynthZone = append(view.SynthZone, protocol.CardView{
 			Slot:     sc.Slot,
 			Faction:  sc.Card.SubFaction.String(),
 			CardType: sc.Card.CardType.String(),
 			Points:   protocol.IntPtr(pts),
 		})
+	}
+
+	// 填充时空裂缝者的裂缝状态（供客户端在UI上展示）
+	if p.CharacterID == "liewen" && p.Char != nil {
+		rifts := 0
+		riftBonus := 3
+		if v, ok := p.Char.ExtraState["rifts"]; ok {
+			if i, ok := v.(int); ok {
+				rifts = i
+			}
+		}
+		if v, ok := p.Char.ExtraState["rift_bonus"]; ok {
+			if i, ok := v.(int); ok {
+				riftBonus = i
+			}
+		}
+		view.ExtraInfo = map[string]any{
+			"rifts":      rifts,
+			"rift_bonus": riftBonus,
+		}
 	}
 
 	return view
