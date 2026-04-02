@@ -972,6 +972,11 @@ func (e *Engine) aiSkillCost(p *PlayerState, pts int) int {
 	}
 	// UseSkillOverride 角色（时空裂缝者/血魔）的固定成本
 	if p.Char.Def.Hooks != nil && p.Char.Def.Hooks.UseSkillOverride != nil {
+		// 血魔者的技能无能量消耗
+		if p.Char.Def.ID == "xuemo" {
+			return 0
+		}
+		// 时空裂缝者的固定成本
 		if pts <= 2 {
 			return 15
 		}
