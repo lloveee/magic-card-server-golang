@@ -234,6 +234,10 @@ func init() {
 			InitHP:         60,
 			InitEnergy:     60,
 			OnPhaseStart: func(phase string, es map[string]any) (int, string) {
+				// 只在行动阶段开始时产生裂缝能量（每回合一次）
+				if phase != "action" {
+					return 0, ""
+				}
 				// 每个阶段开始时，每条裂缝提供 rift_bonus 点能量
 				rifts := esInt(es, "rifts", 0)
 				if rifts == 0 {

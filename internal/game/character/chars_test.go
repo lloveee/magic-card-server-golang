@@ -33,3 +33,35 @@ func TestXuemoSkillCostZero(t *testing.T) {
 		}
 	}
 }
+
+// TestLiewenPhaseStart_OnlyActionPhase 裂缝能量只在 "action" 阶段开始时产生。
+func TestLiewenPhaseStart_OnlyActionPhase(t *testing.T) {
+	inst, err := character.NewInstance("liewen")
+	if err != nil {
+		t.Fatalf("NewInstance: %v", err)
+	}
+
+	// 先设置裂缝状态
+	inst.ExtraState["rifts"] = 2
+	inst.ExtraState["rift_bonus"] = 3
+
+	nonActionPhases := []string{"field_draw", "draw", "combat", "cleanup"}
+	for _, phase := range nonActionPhases {
+		delta, msg := inst.Def.Hooks.OnPhaseStart(phase, inst.ExtraState)
+		if delta != 0 {
+			t.Errorf("phase=%s: delta = %d, want 0", phase, delta)
+		}
+		if msg != "" {
+			t.Errorf("phase=%s: msg = %q, want empty", phase, msg)
+		}
+	}
+
+	// action 阶段应产生 rifts*rift_bonus = 6 点
+	delta, msg := inst.Def.Hooks.OnPhaseStart("action", inst.ExtraState)
+	if delta != 6 {
+		t.Errorf("action phase: delta = %d, want 6 (2 rifts × 3 bonus)", delta)
+	}
+	if msg == "" {
+		t.Error("action phase: expected non-empty msg")
+	}
+}
