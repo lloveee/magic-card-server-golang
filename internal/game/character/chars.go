@@ -392,7 +392,7 @@ func init() {
 						Tier:       TierEnhanced,
 						DamageSelf: 20,
 						Desc:       "血誓：自身受到 20 点伤害，下次攻击总和 +10",
-					}, 20, true
+					}, 0, true
 				}
 				// 普通技能：自伤 10，摸 2 张牌
 				return &SkillResult{
@@ -400,7 +400,7 @@ func init() {
 					DamageSelf: 10,
 					DrawCards:  2,
 					Desc:       "血祭：自身受到 10 点伤害，摸 2 张牌",
-				}, 15, true
+				}, 0, true
 			},
 		},
 	})
