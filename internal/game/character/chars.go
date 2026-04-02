@@ -238,7 +238,7 @@ func init() {
 				if phase != "action" {
 					return 0, ""
 				}
-				// 每个阶段开始时，每条裂缝提供 rift_bonus 点能量
+				// 行动阶段开始时，每条裂缝提供 rift_bonus 点能量
 				rifts := esInt(es, "rifts", 0)
 				if rifts == 0 {
 					return 0, ""
