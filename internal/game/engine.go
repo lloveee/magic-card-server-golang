@@ -348,12 +348,26 @@ func (e *Engine) runAction() bool {
 
 		case <-ticker.C:
 			// 每秒推送剩余时间
-			if !e.state.Players[e.state.ActiveSeat].ActionDone {
+			seat := e.state.ActiveSeat
+			if !e.state.Players[seat].ActionDone {
 				remaining := int(time.Until(turnDeadline).Seconds())
+				// 断线加速：当前行动方离线时，将剩余时间压缩到 15 秒
+				if !e.room.Players[seat].IsOnline() && remaining > 15 {
+					turnDeadline = time.Now().Add(15 * time.Second)
+					if !turnTimer.Stop() {
+						select {
+						case <-turnTimer.C:
+						default:
+						}
+					}
+					turnTimer.Reset(15 * time.Second)
+					remaining = 15
+					slog.Info("disconnect timer reduction", "gameID", e.state.GameID, "seat", seat)
+				}
 				if remaining < 0 {
 					remaining = 0
 				}
-				e.broadcastTurnTimer(e.state.ActiveSeat, remaining)
+				e.broadcastTurnTimer(seat, remaining)
 			}
 
 		case <-e.ctx.Done():
