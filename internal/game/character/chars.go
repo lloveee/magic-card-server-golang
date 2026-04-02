@@ -2,6 +2,9 @@ package character
 
 import "fmt"
 
+// LiewenDefaultRiftBonus 是裂缝者每条裂缝每阶段的初始能量产出。
+const LiewenDefaultRiftBonus = 3
+
 // chars.go 注册全部角色。
 //
 // 角色设计思路：
@@ -243,7 +246,7 @@ func init() {
 				if rifts == 0 {
 					return 0, ""
 				}
-				bonus := esInt(es, "rift_bonus", 3)
+				bonus := esInt(es, "rift_bonus", LiewenDefaultRiftBonus)
 				delta := rifts * bonus
 				return delta, fmt.Sprintf("时空裂缝（%d条）提供 %d 点能量", rifts, delta)
 			},
@@ -265,7 +268,7 @@ func init() {
 					}, 15, true
 				}
 				// 强化技能：消耗 30 能量，每条裂缝每阶段能量产出 +2
-				cur := esInt(es, "rift_bonus", 3)
+				cur := esInt(es, "rift_bonus", LiewenDefaultRiftBonus)
 				es["rift_bonus"] = cur + 2
 				return &SkillResult{
 					Tier: TierEnhanced,

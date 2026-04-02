@@ -39,6 +39,18 @@ func BuildView(gs *GameState, forSeat int) *protocol.GameStateView {
 	return view
 }
 
+// applyModifiedPoints 对卡牌点数应用角色被动修正。
+// 仅对有效攻击牌生效：实际攻击牌，或角色具有 AllCardsAsAttack 标志的任意牌。
+func applyModifiedPoints(pts int, c *card.Card, p *PlayerState) int {
+	if p.Char == nil || p.Char.Def.Hooks == nil || p.Char.Def.Hooks.ModifyCardPoints == nil {
+		return pts
+	}
+	if c.CardType == card.TypeAttack || p.Char.Def.Hooks.AllCardsAsAttack {
+		return p.Char.Def.Hooks.ModifyCardPoints(pts, p.Char.ExtraState)
+	}
+	return pts
+}
+
 // buildSelfView 构建"自己"的完整视图。
 func buildSelfView(p *PlayerState) protocol.PlayerView {
 	charName := p.CharacterID
@@ -60,16 +72,7 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 
 	// 手牌区：完整内容（含槽位编号，客户端用于 UI 排列）
 	for _, sc := range p.Hand.HandSlottedCards() {
-		pts := sc.Card.Points
-		// 应用角色牌面点数修正（如万能者阶段2+2、血魔者受伤≥50后+3）
-		// 只对有效攻击牌应用（AllCardsAsAttack 角色对所有牌生效）
-		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.ModifyCardPoints != nil {
-			effectiveAttack := sc.Card.CardType == card.TypeAttack ||
-				p.Char.Def.Hooks.AllCardsAsAttack
-			if effectiveAttack {
-				pts = p.Char.Def.Hooks.ModifyCardPoints(pts, p.Char.ExtraState)
-			}
-		}
+		pts := applyModifiedPoints(sc.Card.Points, sc.Card, p)
 		view.Hand = append(view.Hand, protocol.CardView{
 			Slot:     sc.Slot,
 			Faction:  sc.Card.SubFaction.String(),
@@ -80,14 +83,7 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 
 	// 合成区：完整内容
 	for _, sc := range p.Hand.SynthSlottedCards() {
-		pts := sc.Card.Points
-		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.ModifyCardPoints != nil {
-			effectiveAttack := sc.Card.CardType == card.TypeAttack ||
-				p.Char.Def.Hooks.AllCardsAsAttack
-			if effectiveAttack {
-				pts = p.Char.Def.Hooks.ModifyCardPoints(pts, p.Char.ExtraState)
-			}
-		}
+		pts := applyModifiedPoints(sc.Card.Points, sc.Card, p)
 		view.SynthZone = append(view.SynthZone, protocol.CardView{
 			Slot:     sc.Slot,
 			Faction:  sc.Card.SubFaction.String(),
@@ -99,7 +95,7 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 	// 填充时空裂缝者的裂缝状态（供客户端在UI上展示）
 	if p.CharacterID == "liewen" && p.Char != nil {
 		rifts := 0
-		riftBonus := 3
+		riftBonus := character.LiewenDefaultRiftBonus
 		if v, ok := p.Char.ExtraState["rifts"]; ok {
 			if i, ok := v.(int); ok {
 				rifts = i

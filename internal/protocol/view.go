@@ -29,9 +29,9 @@ type PendingAttackView struct {
 // Phase 4（游戏引擎）会调用 BuildView 填充这个结构体。
 type GameStateView struct {
 	Round         int                `json:"round"`
-	Phase         string             `json:"phase"`         // "field_draw","draw","action","combat","cleanup","secret_realm"
-	ActiveSeat    int                `json:"active_seat"`   // 当前该谁操作
-	FieldEffect   string             `json:"field_effect"`  // 当前场地效果名称
+	Phase         string             `json:"phase"`                    // "field_draw","draw","action","combat","cleanup","secret_realm"
+	ActiveSeat    int                `json:"active_seat"`              // 当前该谁操作
+	FieldEffect   string             `json:"field_effect"`             // 当前场地效果名称
 	PendingAttack *PendingAttackView `json:"pending_attack,omitempty"` // 非nil=防御窗口开启
 	Me            PlayerView         `json:"me"`
 	Opponent      OpponentView       `json:"opponent"`
@@ -44,13 +44,13 @@ type PlayerView struct {
 	MaxHP       int        `json:"max_hp"`
 	Energy      int        `json:"energy"`
 	MaxEnergy   int        `json:"max_energy"`
-	Character   string     `json:"character"`    // 角色名，未公开时为 "???"（但自己永远知道自己的角色）
+	Character   string     `json:"character"` // 角色名，未公开时为 "???"（但自己永远知道自己的角色）
 	IsNearDeath bool       `json:"is_near_death"`
-	Hand        []CardView     `json:"hand"`                  // 手牌区，最多 8 张
-	SynthZone   []CardView     `json:"synth_zone"`            // 合成区，最多 4 张
+	Hand        []CardView `json:"hand"`       // 手牌区，最多 8 张
+	SynthZone   []CardView `json:"synth_zone"` // 合成区，最多 4 张
 	// ExtraInfo 存放角色特定的额外状态（如时空裂缝者的裂缝数量和产能）
 	// 不需要时为 nil，JSON 序列化会省略此字段
-	ExtraInfo   map[string]any `json:"extra_info,omitempty"`
+	ExtraInfo map[string]any `json:"extra_info,omitempty"`
 }
 
 // OpponentView 是玩家看到的对手的受限信息。
@@ -59,7 +59,7 @@ type OpponentView struct {
 	Seat        int    `json:"seat"`
 	HP          int    `json:"hp"`
 	MaxHP       int    `json:"max_hp"`
-	Energy      int    `json:"energy"`    // 能量条数值双方可见（游戏设计上是公开信息）
+	Energy      int    `json:"energy"` // 能量条数值双方可见（游戏设计上是公开信息）
 	MaxEnergy   int    `json:"max_energy"`
 	Character   string `json:"character"` // 暗置时 "???"，使用过技能后公开
 	IsNearDeath bool   `json:"is_near_death"`
