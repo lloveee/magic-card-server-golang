@@ -34,5 +34,10 @@ func (r *Router) dispatch(s *Session, msgID uint16, data []byte) {
 		slog.Warn("unknown msgID", "msgID", msgID, "sessionID", s.ID)
 		return
 	}
+	defer func() {
+		if rv := recover(); rv != nil {
+			slog.Error("handler panic recovered", "msgID", msgID, "sessionID", s.ID, "panic", rv)
+		}
+	}()
 	h(s, data)
 }

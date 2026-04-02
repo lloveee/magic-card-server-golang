@@ -31,13 +31,15 @@ type action struct {
 // Engine 是一局游戏的权威状态机。
 //
 // 并发模型：
-//   整个游戏逻辑在一个独立的 goroutine（run()）中顺序执行。
-//   玩家的网络消息通过 actionCh channel 投递进来，由 run() goroutine 消费。
+//
+//	整个游戏逻辑在一个独立的 goroutine（run()）中顺序执行。
+//	玩家的网络消息通过 actionCh channel 投递进来，由 run() goroutine 消费。
 //
 // 为什么选择"单 goroutine 顺序执行"而不是"并发处理每个操作"？
-//   游戏状态是高度相关的（一个操作可能影响另一个操作的合法性），
-//   串行处理彻底消除了竞态条件，GameState 无需加锁。
-//   这是游戏引擎的经典设计，和 Redis 的单线程模型同理。
+//
+//	游戏状态是高度相关的（一个操作可能影响另一个操作的合法性），
+//	串行处理彻底消除了竞态条件，GameState 无需加锁。
+//	这是游戏引擎的经典设计，和 Redis 的单线程模型同理。
 type Engine struct {
 	state    *GameState
 	room     *room.Room
@@ -98,6 +100,9 @@ func (e *Engine) SubmitAction(seat int, msgID uint16, payload []byte) {
 func (e *Engine) run() {
 	defer e.Stop()
 	defer func() {
+		if rv := recover(); rv != nil {
+			slog.Error("engine panic recovered", "gameID", e.state.GameID, "panic", rv)
+		}
 		if e.onDone != nil {
 			e.onDone()
 		}
