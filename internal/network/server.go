@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"sync"
@@ -28,20 +29,35 @@ func NewServer(addr string, router *Router) *Server {
 }
 
 // Start 开始监听并阻塞接受连接，通常在主 goroutine 调用。
+// ctx 取消时优雅关闭：停止接受新连接，关闭所有现有会话后返回 nil。
 // 出错时返回 error（例如端口被占用）。
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
 	ln, err := net.Listen("tcp", s.addr)
 	if err != nil {
 		return err
 	}
 	slog.Info("server started", "addr", s.addr)
 
+	// 监听 context 取消，关闭 listener 打断 Accept 阻塞
+	go func() {
+		<-ctx.Done()
+		ln.Close()
+	}()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			// Accept 出错通常是 listener 被关闭，记录后退出
-			slog.Error("accept error", "err", err)
-			return err
+			// 检查是否是 context 取消导致的关闭
+			select {
+			case <-ctx.Done():
+				slog.Info("server shutting down...")
+				s.drainSessions()
+				slog.Info("server shut down cleanly")
+				return nil
+			default:
+				slog.Error("accept error", "err", err)
+				return err
+			}
 		}
 
 		sess := newSession(conn, s.router, s)
@@ -52,6 +68,14 @@ func (s *Server) Start() error {
 		// 这是 Go 服务器的标准模式：goroutine-per-connection
 		go sess.run()
 	}
+}
+
+// drainSessions 关闭所有活跃会话（优雅关停时调用）。
+func (s *Server) drainSessions() {
+	s.sessions.Range(func(_, v any) bool {
+		v.(*Session).Close()
+		return true
+	})
 }
 
 // removeSession 在会话断开后由 Session.run() 的 defer 调用，清理映射表。

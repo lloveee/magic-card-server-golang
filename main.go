@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"echo/internal/game"
 	"echo/internal/matchmaking"
@@ -46,9 +49,12 @@ func main() {
 	// 房间创建时，自动为该房间创建并启动游戏引擎
 	roomMgr.OnRoomCreated(gameHandler.OnRoomCreated)
 
-	// ── 启动服务器 ─────────────────────────────────────────────
+	// ── 启动服务器（支持 SIGINT/SIGTERM 优雅关停）──────────────
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	srv := network.NewServer("0.0.0.0:43966", router)
-	if err := srv.Start(); err != nil {
+	if err := srv.Start(ctx); err != nil {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)
 	}
