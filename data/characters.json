@@ -1,0 +1,289 @@
+[
+  {
+    "enhanced": {
+      "energy_cost": 20,
+      "name": "强化裁决",
+      "result": {
+        "deal_direct_damage": 16,
+        "desc": "强化裁决：对对手造成16点直接伤害"
+      }
+    },
+    "id": "licai",
+    "lib": {
+      "energy_cost": 80,
+      "name": "绝对裁决",
+      "result": {
+        "deal_direct_damage": 30,
+        "desc": "绝对裁决：造成30点直接伤害并回复20点生命",
+        "heal_self": 20
+      }
+    },
+    "lib_threshold": 80,
+    "manual_lib": true,
+    "max_energy": 100,
+    "max_hp": 100,
+    "name": "力裁者",
+    "normal": {
+      "energy_cost": 10,
+      "name": "力裁斩击",
+      "result": {
+        "deal_direct_damage": 8,
+        "desc": "力裁斩击：对对手造成8点直接伤害"
+      }
+    },
+    "passive": {
+      "bonus_outgoing": 1
+    }
+  },
+  {
+    "enhanced": {
+      "energy_cost": 16,
+      "name": "镜像反击",
+      "result": {
+        "deal_direct_damage": 10,
+        "desc": "镜像反击：摸3张牌并造成10点直接伤害",
+        "draw_cards": 3
+      }
+    },
+    "id": "jinghuan",
+    "lib": {
+      "energy_cost": 80,
+      "name": "镜换轮转",
+      "result": {
+        "deal_direct_damage": 20,
+        "desc": "镜换轮转：造成20点直接伤害，回复20点生命，摸2张牌",
+        "draw_cards": 2,
+        "heal_self": 20
+      }
+    },
+    "lib_threshold": 80,
+    "manual_lib": true,
+    "max_energy": 100,
+    "max_hp": 90,
+    "name": "镜换者",
+    "normal": {
+      "energy_cost": 8,
+      "name": "镜像映射",
+      "result": {
+        "desc": "镜像映射：摸2张牌并回复5点生命",
+        "draw_cards": 2,
+        "heal_self": 5
+      }
+    },
+    "passive": {
+      "incoming_reduction": 1
+    }
+  },
+  {
+    "enhanced": {
+      "energy_cost": 10,
+      "name": "引气冲拳",
+      "result": {
+        "deal_direct_damage": 8,
+        "desc": "引气冲拳：获得30点能量并造成8点直接伤害",
+        "gain_energy": 30
+      }
+    },
+    "id": "kongshou",
+    "lib": {
+      "energy_cost": 60,
+      "name": "空手相搏",
+      "result": {
+        "deal_direct_damage": 20,
+        "desc": "空手相搏：造成20点直接伤害，回复20点生命，获得20点能量",
+        "gain_energy": 20,
+        "heal_self": 20
+      }
+    },
+    "lib_threshold": 60,
+    "manual_lib": true,
+    "max_energy": 100,
+    "max_hp": 95,
+    "name": "空手者",
+    "normal": {
+      "energy_cost": 5,
+      "name": "虚拳引气",
+      "result": {
+        "desc": "虚拳引气：获得20点能量",
+        "gain_energy": 20
+      }
+    },
+    "passive": {}
+  },
+  {
+    "enhanced": {
+      "energy_cost": 20,
+      "name": "深渊噬魂",
+      "result": {
+        "deal_direct_damage": 14,
+        "desc": "深渊噬魂：造成14点直接伤害并汲取10点生命",
+        "heal_self": 10
+      }
+    },
+    "id": "shiyuan",
+    "lib": {
+      "energy_cost": 80,
+      "name": "渊噬万物",
+      "result": {
+        "deal_direct_damage": 28,
+        "desc": "渊噬万物：造成28点直接伤害并汲取20点生命",
+        "heal_self": 20
+      }
+    },
+    "lib_threshold": 80,
+    "manual_lib": true,
+    "max_energy": 100,
+    "max_hp": 95,
+    "name": "噬渊者",
+    "normal": {
+      "energy_cost": 10,
+      "name": "噬渊之触",
+      "result": {
+        "deal_direct_damage": 6,
+        "desc": "噬渊之触：造成6点直接伤害并汲取6点生命",
+        "heal_self": 6
+      }
+    },
+    "passive": {}
+  },
+  {
+    "enhanced": {
+      "energy_cost": 20,
+      "name": "烈焰灼血",
+      "result": {
+        "deal_direct_damage": 20,
+        "desc": "烈焰灼血：造成20点直接伤害"
+      }
+    },
+    "id": "zhuoxue",
+    "lib": {
+      "energy_cost": 80,
+      "name": "血焰爆发",
+      "result": {
+        "deal_direct_damage": 40,
+        "desc": "血焰爆发：造成40点直接伤害"
+      }
+    },
+    "lib_threshold": 80,
+    "manual_lib": true,
+    "max_energy": 100,
+    "max_hp": 85,
+    "name": "灼血者",
+    "normal": {
+      "energy_cost": 10,
+      "name": "灼血冲击",
+      "result": {
+        "deal_direct_damage": 10,
+        "desc": "灼血冲击：造成10点直接伤害"
+      }
+    },
+    "passive": {
+      "bonus_outgoing": 2
+    }
+  },
+  {
+    "enhanced": {
+      "energy_cost": 16,
+      "name": "殉道之力",
+      "result": {
+        "desc": "殉道之力：回复20点生命并获得10点能量",
+        "gain_energy": 10,
+        "heal_self": 20
+      }
+    },
+    "id": "xundao",
+    "lib": {
+      "name": "殉道解放",
+      "result": {
+        "desc": "殉道解放：自动触发，濒死时回复30点生命并获得10点能量",
+        "gain_energy": 10,
+        "heal_self": 30
+      }
+    },
+    "lib_threshold": 80,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 110,
+    "name": "殉道者",
+    "normal": {
+      "energy_cost": 8,
+      "name": "殉道之愿",
+      "result": {
+        "desc": "殉道之愿：回复10点生命",
+        "heal_self": 10
+      }
+    },
+    "passive": {
+      "intercept_near_death": true
+    }
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "default_rift_bonus": 3,
+      "enhanced_skill_cost": 30,
+      "enhanced_skill_pts_threshold": 3,
+      "hp_energy_shared": true,
+      "init_energy": 60,
+      "init_hp": 60,
+      "liberation_energy_threshold": 100,
+      "normal_skill_cost": 15,
+      "rift_bonus_increment": 2
+    },
+    "id": "liewen",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 150,
+    "max_hp": 150,
+    "name": "时空裂缝者",
+    "normal": {},
+    "passive": {}
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "all_cards_as_attack": true,
+      "phase1_attack_bonus": 2,
+      "phase2_card_bonus": 2,
+      "phase3_attack_multiplier": 2,
+      "phase_thresholds": [
+        10,
+        50,
+        100
+      ]
+    },
+    "id": "wanneng",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 80,
+    "name": "万能者",
+    "normal": {},
+    "passive": {}
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "dmg_received_card_bonus": 3,
+      "dmg_received_threshold": 50,
+      "enhanced_atk_bonus": 10,
+      "enhanced_pts_threshold": 3,
+      "enhanced_self_damage": 20,
+      "lifesteal_activate_pts": 25,
+      "lifesteal_damage_threshold": 30,
+      "normal_draw_cards": 2,
+      "normal_self_damage": 10
+    },
+    "id": "xuemo",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 90,
+    "name": "血魔",
+    "normal": {},
+    "passive": {}
+  }
+]

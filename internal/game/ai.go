@@ -33,12 +33,12 @@ import (
 type aiActionKind int
 
 const (
-	aiActEndTurn    aiActionKind = iota // 宣告结束行动（保底）
-	aiActLiberate                       // 触发解放技能
-	aiActUseSkill                       // 使用技能牌
-	aiActSynthesize                     // 合成两张牌
-	aiActMoveToSynth                    // 将手牌移入合成区
-	aiActPlayCard                       // 出攻击牌或能耗牌
+	aiActEndTurn     aiActionKind = iota // 宣告结束行动（保底）
+	aiActLiberate                        // 触发解放技能
+	aiActUseSkill                        // 使用技能牌
+	aiActSynthesize                      // 合成两张牌
+	aiActMoveToSynth                     // 将手牌移入合成区
+	aiActPlayCard                        // 出攻击牌或能耗牌
 )
 
 // aiAct 描述一个具体可执行的 AI 行动及其评分。
@@ -324,8 +324,8 @@ func (e *Engine) scoreActions(ctx aiCtx) []aiAct {
 		s := e.scoreSynth(ctx, op)
 		if s > 0 {
 			acts = append(acts, aiAct{
-				kind:  aiActSynthesize,
-				zone:  op.zone1, slot: op.slot1,
+				kind: aiActSynthesize,
+				zone: op.zone1, slot: op.slot1,
 				zone2: op.zone2, slot2: op.slot2,
 				score: s, desc: "合成",
 			})

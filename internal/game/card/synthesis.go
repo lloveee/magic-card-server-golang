@@ -14,16 +14,17 @@ import (
 type ReincarnationRule int8
 
 const (
-	ReincarnationNormal   ReincarnationRule = iota // 标准规则（无场地效果）
-	ReincarnationAsBase                            // 轮回之境·实：结果 = 轮回牌自身点数
-	ReincarnationAsOther                           // 轮回之境·虚：结果 = 非轮回牌的点数
+	ReincarnationNormal  ReincarnationRule = iota // 标准规则（无场地效果）
+	ReincarnationAsBase                           // 轮回之境·实：结果 = 轮回牌自身点数
+	ReincarnationAsOther                          // 轮回之境·虚：结果 = 非轮回牌的点数
 )
 
 // SynthesisOpts 是合成操作的配置，由当前生效的场地效果决定。
 //
 // 为什么用 Options 结构体而不是全局变量？
-//   场地效果只在本阶段有效，传入 opts 让合成函数保持"纯函数"特性：
-//   相同输入 + 相同 opts = 相同输出，便于测试和调试。
+//
+//	场地效果只在本阶段有效，传入 opts 让合成函数保持"纯函数"特性：
+//	相同输入 + 相同 opts = 相同输出，便于测试和调试。
 type SynthesisOpts struct {
 	// PointsCap 是合成结果的点数上限。
 	// 默认 5，IllusionBonus 激活且结果为虚幻牌时可提升至 7。
@@ -88,9 +89,10 @@ func Validate(a, b *Card) error {
 //   - IsHidden = false（合成产生的牌点数公开，隐藏状态来自场地效果，在抽牌时设置）
 //
 // 为什么结果继承 base 的属性？
-//   玩家选择"哪张牌作为 base"就是在选择结果的功能类型。
-//   这给了玩家主动权：想要攻击牌结果，就把攻击牌放在第一位置。
-//   比"随机决定"或"固定规则决定"更有策略性。
+//
+//	玩家选择"哪张牌作为 base"就是在选择结果的功能类型。
+//	这给了玩家主动权：想要攻击牌结果，就把攻击牌放在第一位置。
+//	比"随机决定"或"固定规则决定"更有策略性。
 func Combine(base, ingredient *Card, opts SynthesisOpts) (*Card, error) {
 	// 混沌之域（AllowSameType）：跳过同类型检查，但仍须检查已合成标记和空牌
 	if !opts.AllowSameType {

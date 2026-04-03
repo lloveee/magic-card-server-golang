@@ -31,10 +31,10 @@ func eng(sf card.SubFaction, pts int) *card.Card { return card.New(sf, card.Type
 func TestCombine_SameMajor_Multiplies(t *testing.T) {
 	// 同大系（梦幻+梦幻）→ 点数相乘
 	cases := []struct {
-		name   string
-		base   *card.Card
-		ingr   *card.Card
-		want   int
+		name string
+		base *card.Card
+		ingr *card.Card
+		want int
 	}{
 		{"梦境攻击×梦境技能 2×3=6", atk(card.SubDream, 2), skl(card.SubDream, 3), 6},
 		{"梦境攻击×梦境技能 2×2=4", atk(card.SubDream, 2), skl(card.SubDream, 2), 4},
@@ -96,8 +96,8 @@ func TestCombine_DifferentMajor_Adds(t *testing.T) {
 
 func TestCombine_SameType_ReturnsErrSameCardType(t *testing.T) {
 	pairs := [][2]*card.Card{
-		{atk(card.SubDream, 1), atk(card.SubReform, 2)},       // 攻击+攻击
-		{skl(card.SubDream, 1), skl(card.SubDream, 2)},        // 技能+技能
+		{atk(card.SubDream, 1), atk(card.SubReform, 2)},           // 攻击+攻击
+		{skl(card.SubDream, 1), skl(card.SubDream, 2)},            // 技能+技能
 		{eng(card.SubIllusion, 3), eng(card.SubReincarnation, 1)}, // 能耗+能耗
 	}
 

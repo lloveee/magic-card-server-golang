@@ -10,14 +10,14 @@ import "math/rand"
 type EffectID string
 
 const (
-	EffectClear        EffectID = "clear"        // 空旷之地：无效果
+	EffectClear        EffectID = "clear"         // 空旷之地：无效果
 	EffectIllusionReal EffectID = "illusion_real" // 虚幻之境·实：虚幻牌合成上限提升至 7
 	EffectIllusionVoid EffectID = "illusion_void" // 虚幻之境·虚：本回合补入的牌点数对对手隐藏
-	EffectReincBase    EffectID = "reinc_base"   // 轮回之境·实：轮回牌参与合成时结果 = 轮回牌自身点数
-	EffectReincOther   EffectID = "reinc_other"  // 轮回之境·虚：轮回牌参与合成时结果 = 另一张牌的点数
-	EffectChaos        EffectID = "chaos"        // 混沌之域：允许同功能牌型合成
-	EffectEcho         EffectID = "echo"         // 回响之地：攻击牌伤害 +1
-	EffectProtect      EffectID = "protect"      // 守护之光：濒死玩家每轮扣血从 30 减少至 15
+	EffectReincBase    EffectID = "reinc_base"    // 轮回之境·实：轮回牌参与合成时结果 = 轮回牌自身点数
+	EffectReincOther   EffectID = "reinc_other"   // 轮回之境·虚：轮回牌参与合成时结果 = 另一张牌的点数
+	EffectChaos        EffectID = "chaos"         // 混沌之域：允许同功能牌型合成
+	EffectEcho         EffectID = "echo"          // 回响之地：攻击牌伤害 +1
+	EffectProtect      EffectID = "protect"       // 守护之光：濒死玩家每轮扣血从 30 减少至 15
 )
 
 // ReincarnHint 镜像 card.ReincarnationRule，避免循环导入。

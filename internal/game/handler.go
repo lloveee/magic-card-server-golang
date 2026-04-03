@@ -13,9 +13,9 @@ import (
 // Handler 将进来的网络消息路由到对应房间的 Engine。
 //
 // 关键职责：
-//   1. 根据 Session 找到对应的 Player
-//   2. 根据 Player 的 RoomID 找到对应的 Engine
-//   3. 把消息投递给 Engine.SubmitAction
+//  1. 根据 Session 找到对应的 Player
+//  2. 根据 Player 的 RoomID 找到对应的 Engine
+//  3. 把消息投递给 Engine.SubmitAction
 //
 // 不做：不处理任何游戏逻辑（逻辑全在 Engine）。
 type Handler struct {

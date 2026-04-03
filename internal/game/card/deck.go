@@ -26,13 +26,15 @@ var allCardTypes = []CardType{
 // 每次 Draw 产生一张随机牌，来自 4 个子系 × 3 种功能 × 5 个点数的组合空间。
 //
 // 为什么不用 crypto/rand？
-//   游戏随机性不需要密码学安全，math/rand 速度更快。
-//   每个 Deck 有独立的 rng，保证两局游戏的随机序列互不干扰。
+//
+//	游戏随机性不需要密码学安全，math/rand 速度更快。
+//	每个 Deck 有独立的 rng，保证两局游戏的随机序列互不干扰。
 //
 // 为什么 Deck 不是全局单例？
-//   每个 GameState 持有自己的 Deck，并记录初始 seed。
-//   这让"录像回放"成为可能：用相同 seed 重建 Deck，重放所有操作，
-//   得到完全一致的牌序列。（Phase 6 后续扩展）
+//
+//	每个 GameState 持有自己的 Deck，并记录初始 seed。
+//	这让"录像回放"成为可能：用相同 seed 重建 Deck，重放所有操作，
+//	得到完全一致的牌序列。（Phase 6 后续扩展）
 type Deck struct {
 	rng  *rand.Rand
 	seed int64

@@ -1,0 +1,41 @@
+[
+  {
+    "id": "clear",
+    "name": "空旷之地"
+  },
+  {
+    "id": "illusion_real",
+    "illusion_bonus": true,
+    "name": "虚幻之境·实"
+  },
+  {
+    "hide_drawn_cards": true,
+    "id": "illusion_void",
+    "name": "虚幻之境·虚"
+  },
+  {
+    "id": "reinc_base",
+    "name": "轮回之境·实",
+    "reincarn_rule": 1
+  },
+  {
+    "id": "reinc_other",
+    "name": "轮回之境·虚",
+    "reincarn_rule": 2
+  },
+  {
+    "allow_same_type": true,
+    "id": "chaos",
+    "name": "混沌之域"
+  },
+  {
+    "bonus_attack": 1,
+    "id": "echo",
+    "name": "回响之地"
+  },
+  {
+    "id": "protect",
+    "name": "守护之光",
+    "near_death_drain": 15
+  }
+]

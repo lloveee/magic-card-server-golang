@@ -44,8 +44,9 @@ func NewInstance(charID string) (*CharInstance, error) {
 // 返回：(技能结果, 能量消耗, 错误)
 //
 // 优先检查 Hooks.UseSkillOverride；若未处理则回退默认逻辑：
-//   cardPoints ≤ 2 → TierNormal
-//   cardPoints ≥ 3 → TierEnhanced
+//
+//	cardPoints ≤ 2 → TierNormal
+//	cardPoints ≥ 3 → TierEnhanced
 func (ci *CharInstance) UseSkill(cardPoints int) (*SkillResult, int, error) {
 	// 先尝试钩子覆盖
 	if ci.Def.Hooks != nil && ci.Def.Hooks.UseSkillOverride != nil {

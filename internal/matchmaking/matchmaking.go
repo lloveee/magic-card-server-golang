@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"sync"
 
+	"echo/internal/game/character"
+	"echo/internal/game/field"
 	"echo/internal/network"
 	"echo/internal/player"
 	"echo/internal/protocol"
@@ -18,8 +20,9 @@ import (
 // 每当队列中有 2 名玩家，立即配对并创建房间。
 //
 // 为什么用 slice + Mutex 而不是 channel？
-//   channel 做队列无法实现"根据 ID 删除中间元素"（玩家取消匹配）。
-//   slice + Mutex 可以按 ID 查找并删除，更灵活。
+//
+//	channel 做队列无法实现"根据 ID 删除中间元素"（玩家取消匹配）。
+//	slice + Mutex 可以按 ID 查找并删除，更灵活。
 type Queue struct {
 	mu      sync.Mutex
 	waiting []*player.Player
@@ -89,14 +92,15 @@ func (q *Queue) tryMatch() {
 // Handler 封装匹配系统的消息处理函数，持有所有依赖。
 // 比起全局变量或函数参数传递，Handler 结构体让依赖关系更清晰。
 type Handler struct {
-	playerMgr *player.Manager
-	queue     *Queue
-	roomMgr   *room.Manager
+	playerMgr  *player.Manager
+	queue      *Queue
+	roomMgr    *room.Manager
+	configHash string // 游戏配置版本哈希，启动时计算
 }
 
 // NewHandler 创建 Handler，需传入所有依赖（依赖注入）。
-func NewHandler(pm *player.Manager, q *Queue, rm *room.Manager) *Handler {
-	return &Handler{playerMgr: pm, queue: q, roomMgr: rm}
+func NewHandler(pm *player.Manager, q *Queue, rm *room.Manager, configHash string) *Handler {
+	return &Handler{playerMgr: pm, queue: q, roomMgr: rm, configHash: configHash}
 }
 
 // RegisterAll 将所有匹配相关的 handler 注册到 router。
@@ -106,6 +110,7 @@ func (h *Handler) RegisterAll(r *network.Router) {
 	r.Register(protocol.MsgJoinQueueReq, h.handleJoinQueue)
 	r.Register(protocol.MsgLeaveQueueReq, h.handleLeaveQueue)
 	r.Register(protocol.MsgCreateAIGameReq, h.handleCreateAIGame)
+	r.Register(protocol.MsgGameConfigReq, h.handleGameConfigReq)
 }
 
 // handleLogin 处理登录请求，支持首次登录和断线重连两种路径。
@@ -134,6 +139,7 @@ func (h *Handler) handleLogin(s *network.Session, data []byte) {
 			PlayerID:       p.ID,
 			ReconnectToken: req.ReconnectToken, // 原 token 续期，客户端继续保存
 			InGame:         inGame,
+			ConfigHash:     h.configHash,
 		}))
 
 		// 若仍在对局中，重发 MatchFoundEv 让客户端回到游戏界面
@@ -166,6 +172,16 @@ func (h *Handler) handleLogin(s *network.Session, data []byte) {
 		Success:        true,
 		PlayerID:       p.ID,
 		ReconnectToken: token, // 客户端必须持久化这个 token！
+		ConfigHash:     h.configHash,
+	}))
+}
+
+// handleGameConfigReq 客户端请求完整配置（本地缓存 hash 不匹配时发送）。
+func (h *Handler) handleGameConfigReq(s *network.Session, _ []byte) {
+	s.Send(protocol.MsgGameConfigEv, protocol.MustEncode(protocol.GameConfigEv{
+		Characters: character.AllJSON(),
+		Fields:     field.AllJSON(),
+		ConfigHash: h.configHash,
 	}))
 }
 

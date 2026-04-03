@@ -36,27 +36,29 @@ const (
 	MsgCreateAIGameReq    uint16 = 2007 // C→S 创建人机对战（即时开始，不进匹配队列）
 
 	// ── 游戏状态同步 ───────────────────────────────────────
-	MsgGameStateEv  uint16 = 3001 // S→C 完整状态快照（阶段开始时发送）
+	MsgGameStateEv   uint16 = 3001 // S→C 完整状态快照（阶段开始时发送）
 	MsgPhaseChangeEv uint16 = 3002 // S→C 阶段切换通知
 
 	// ── 玩家操作（行动阶段内有效） ────────────────────────────
-	MsgPlayCardReq        uint16 = 4001 // C→S 使用攻击牌/能耗牌（从手牌区或合成区）
-	MsgMoveToSynthReq     uint16 = 4002 // C→S 将手牌移入合成区
-	MsgSynthesizeReq      uint16 = 4003 // C→S 合成两张牌
-	MsgUseSkillReq        uint16 = 4004 // C→S 使用主动技能
-	MsgTriggerLibrateReq  uint16 = 4005 // C→S 手动触发解放（适用于主动解放型角色）
-	MsgEndActionReq       uint16 = 4006 // C→S 宣告结束行动阶段
-	MsgDefenseReq         uint16 = 4007 // C→S 防御出牌（响应来袭攻击，Pass=true 表示不防御）
+	MsgPlayCardReq       uint16 = 4001 // C→S 使用攻击牌/能耗牌（从手牌区或合成区）
+	MsgMoveToSynthReq    uint16 = 4002 // C→S 将手牌移入合成区
+	MsgSynthesizeReq     uint16 = 4003 // C→S 合成两张牌
+	MsgUseSkillReq       uint16 = 4004 // C→S 使用主动技能
+	MsgTriggerLibrateReq uint16 = 4005 // C→S 手动触发解放（适用于主动解放型角色）
+	MsgEndActionReq      uint16 = 4006 // C→S 宣告结束行动阶段
+	MsgDefenseReq        uint16 = 4007 // C→S 防御出牌（响应来袭攻击，Pass=true 表示不防御）
 
 	// ── 游戏事件推送 ───────────────────────────────────────
-	MsgDamageEv       uint16 = 5001 // S→C 伤害结算明细
-	MsgSkillUsedEv    uint16 = 5002 // S→C 技能使用（同时公开角色身份）
-	MsgLiberationEv   uint16 = 5003 // S→C 解放触发
-	MsgFieldEffectEv  uint16 = 5004 // S→C 场地效果生效
-	MsgPlayerStatusEv uint16 = 5005 // S→C HP/能量变化（增量更新，不发完整状态）
-	MsgGameOverEv     uint16 = 5006 // S→C 游戏结束
-	MsgErrorEv        uint16 = 5007 // S→C 操作错误反馈（非法操作、时序错误等）
-	MsgBlessingEv          uint16 = 5008 // S→C 赐福触发（HP<40，获得第二角色）
-	MsgIncomingAttackEv    uint16 = 5009 // S→C 来袭攻击通知（等待防御）
-	MsgTurnTimerEv         uint16 = 5010 // S→C 行动倒计时（每秒推送）
+	MsgDamageEv         uint16 = 5001 // S→C 伤害结算明细
+	MsgSkillUsedEv      uint16 = 5002 // S→C 技能使用（同时公开角色身份）
+	MsgLiberationEv     uint16 = 5003 // S→C 解放触发
+	MsgFieldEffectEv    uint16 = 5004 // S→C 场地效果生效
+	MsgPlayerStatusEv   uint16 = 5005 // S→C HP/能量变化（增量更新，不发完整状态）
+	MsgGameOverEv       uint16 = 5006 // S→C 游戏结束
+	MsgErrorEv          uint16 = 5007 // S→C 操作错误反馈（非法操作、时序错误等）
+	MsgBlessingEv       uint16 = 5008 // S→C 赐福触发（HP<40，获得第二角色）
+	MsgIncomingAttackEv uint16 = 5009 // S→C 来袭攻击通知（等待防御）
+	MsgTurnTimerEv      uint16 = 5010 // S→C 行动倒计时（每秒推送）
+	MsgGameConfigEv     uint16 = 5011 // S→C 游戏配置下发（角色+场地数据）
+	MsgGameConfigReq    uint16 = 4008 // C→S 客户端请求完整游戏配置（hash不匹配时）
 )

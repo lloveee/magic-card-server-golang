@@ -56,11 +56,15 @@ type LoginReq struct {
 // LoginResp S→C 登录结果。
 type LoginResp struct {
 	Success        bool   `json:"success"`
-	PlayerID       string `json:"player_id,omitempty"`        // 玩家唯一 ID
-	ReconnectToken string `json:"reconnect_token,omitempty"`  // 客户端必须持久化，断线后凭此重连
-	InGame         bool   `json:"in_game,omitempty"`          // true 表示重连后仍在对局中
+	PlayerID       string `json:"player_id,omitempty"`       // 玩家唯一 ID
+	ReconnectToken string `json:"reconnect_token,omitempty"` // 客户端必须持久化，断线后凭此重连
+	InGame         bool   `json:"in_game,omitempty"`         // true 表示重连后仍在对局中
+	ConfigHash     string `json:"config_hash,omitempty"`     // 游戏配置版本哈希，客户端比对后按需拉取
 	Error          string `json:"error,omitempty"`
 }
+
+// GameConfigReq C→S 客户端请求完整的游戏配置（hash 不匹配时发送）。
+type GameConfigReq struct{}
 
 // ════════════════════════════════════════════════════════════════
 //  匹配消息
@@ -81,7 +85,7 @@ type JoinQueueResp struct {
 // 收到此消息后客户端进入选角界面（Phase 3 补充选角消息）。
 type MatchFoundEv struct {
 	GameID       string `json:"game_id"`
-	YourSeat     int    `json:"your_seat"`     // 0 或 1，决定先后手
+	YourSeat     int    `json:"your_seat"` // 0 或 1，决定先后手
 	OpponentName string `json:"opponent_name"`
 }
 
@@ -224,8 +228,8 @@ type PhaseChangeEv struct {
 
 // BlessingEv S→C 赐福触发（HP < 40 时获得第二角色）。
 type BlessingEv struct {
-	PlayerSeat    int    `json:"player_seat"`
-	SecondCharID  string `json:"second_char_id"`   // 第二角色 ID
+	PlayerSeat     int    `json:"player_seat"`
+	SecondCharID   string `json:"second_char_id"`   // 第二角色 ID
 	SecondCharName string `json:"second_char_name"` // 第二角色显示名
 }
 
@@ -249,6 +253,14 @@ type ClientPingResp struct {
 type TurnTimerEv struct {
 	ActiveSeat  int `json:"active_seat"`  // 当前行动方
 	SecondsLeft int `json:"seconds_left"` // 剩余秒数（0-60）
+}
+
+// GameConfigEv S→C 游戏配置下发（客户端请求时推送）。
+// 包含所有角色和场地效果的数值数据，客户端用此渲染 tooltip 和 UI。
+type GameConfigEv struct {
+	Characters []map[string]any `json:"characters"`
+	Fields     []map[string]any `json:"fields"`
+	ConfigHash string           `json:"config_hash"` // 版本哈希，客户端保存用于下次比对
 }
 
 // ErrorEv S→C 操作错误反馈（非致命，连接不断开）。

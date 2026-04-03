@@ -10,8 +10,8 @@ import "fmt"
 type SkillTier int
 
 const (
-	TierNormal    SkillTier = 1 // 普通技能（技能牌点数 1-2）
-	TierEnhanced  SkillTier = 2 // 强化技能（技能牌点数 3-5）
+	TierNormal     SkillTier = 1 // 普通技能（技能牌点数 1-2）
+	TierEnhanced   SkillTier = 2 // 强化技能（技能牌点数 3-5）
 	TierLiberation SkillTier = 3 // 解放技能（TriggerLibrateReq / 殉道者自动）
 )
 
@@ -53,8 +53,8 @@ type SkillDef struct {
 
 // CharDef 是角色的静态定义（不可变，存于 Registry）。
 type CharDef struct {
-	ID           string
-	Name         string
+	ID   string
+	Name string
 
 	// 初始属性——选择此角色时覆盖 PlayerState 的默认值
 	MaxHP        int

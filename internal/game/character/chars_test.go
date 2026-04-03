@@ -14,8 +14,8 @@ func TestXuemoSkillCostZero(t *testing.T) {
 	}
 
 	cases := []struct {
-		pts     int
-		label   string
+		pts   int
+		label string
 	}{
 		{1, "普通技能(pts=1)"},
 		{3, "强化技能(pts=3)"},
