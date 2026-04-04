@@ -29,6 +29,16 @@ type CharHooks struct {
 
 	// ── 伤害钩子 ─────────────────────────────────────────────────
 
+	// ModifyIncomingDamage 在被动减免之后、HP扣除之前调用。
+	// 返回 (实际受到的伤害, 反弹给来源的伤害)。0=完全免疫。
+	// damageType: "attack"/"skill direct"/"skill self-damage"/"cleanup" 等。
+	ModifyIncomingDamage func(damage int, damageType string, es map[string]any) (int, int)
+
+	// OnLethalCheck 在 HP 归零触发死亡判定之前调用。
+	// opponentHP 为对手当前 HP，允许角色根据对手状态决定是否触发保命。
+	// 返回 (是否存活, 存活后HP, 反弹给对手的伤害)。
+	OnLethalCheck func(damage int, es map[string]any, opponentHP int) (survive bool, hpAfter int, reflectDmg int)
+
 	// OnDamageReceived 在此玩家受到任意来源的最终伤害后调用。
 	OnDamageReceived func(finalDamage int, es map[string]any)
 
@@ -51,6 +61,12 @@ type CharHooks struct {
 	// OnAttackLaunched 在创建 PendingAttack 之前调用。
 	// 返回 (额外攻击点数, 消耗能量)，引擎将额外点数加入攻击并扣除能量。
 	OnAttackLaunched func(attackPoints int, energy int, es map[string]any) (extraPoints int, energySpent int)
+
+	// ── 客户端展示 ─────────────────────────────────────────────────
+
+	// BuildExtraInfo 返回要发送给客户端的额外状态数据（如裂缝数、房子数等）。
+	// 引擎在构建 PlayerView 时调用，返回 nil 表示无额外信息。
+	BuildExtraInfo func(es map[string]any) map[string]any
 
 	// ── 技能覆盖 ─────────────────────────────────────────────────
 

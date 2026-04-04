@@ -92,23 +92,10 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 		})
 	}
 
-	// 填充时空裂缝者的裂缝状态（供客户端在UI上展示）
-	if p.CharacterID == "liewen" && p.Char != nil {
-		rifts := 0
-		riftBonus := character.LiewenDefaultRiftBonus
-		if v, ok := p.Char.ExtraState["rifts"]; ok {
-			if i, ok := v.(int); ok {
-				rifts = i
-			}
-		}
-		if v, ok := p.Char.ExtraState["rift_bonus"]; ok {
-			if i, ok := v.(int); ok {
-				riftBonus = i
-			}
-		}
-		view.ExtraInfo = map[string]any{
-			"rifts":      rifts,
-			"rift_bonus": riftBonus,
+	// 填充角色特定的额外状态（供客户端在UI上展示）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.BuildExtraInfo != nil {
+		if info := p.Char.Def.Hooks.BuildExtraInfo(p.Char.ExtraState); info != nil {
+			view.ExtraInfo = info
 		}
 	}
 

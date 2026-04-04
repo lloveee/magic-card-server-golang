@@ -285,5 +285,48 @@
     "name": "血魔",
     "normal": {},
     "passive": {}
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "enhanced_cost": 15,
+      "enhanced_immune_phases": 3,
+      "enhanced_pts_threshold": 3,
+      "lib_cost": 50,
+      "lib_immune_phases": 10,
+      "lib_pts_threshold": 25,
+      "normal_cost": 10
+    },
+    "id": "fanshang",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 95,
+    "name": "反伤者",
+    "normal": {},
+    "passive": {}
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "base_worker_eff": 1,
+      "damage_halve_threshold": 20,
+      "house1_eff_bonus": 2,
+      "house2_dmg_reduction": 2,
+      "house3_heal": 5,
+      "lib_house_threshold": 5,
+      "lib_pts_max": 25,
+      "lib_pts_min": 20
+    },
+    "id": "jianzao",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 90,
+    "name": "建造者",
+    "normal": {},
+    "passive": {}
   }
 ]

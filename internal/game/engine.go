@@ -672,6 +672,12 @@ func (e *Engine) applyDamageFull(sourceSeat, targetSeat, amount int, detail stri
 		finalDamage = p.SecondChar.ModifyIncoming(finalDamage)
 	}
 
+	// 钩子：ModifyIncomingDamage（反伤/免疫判定，在HP扣除之前）
+	var reflectDamage int
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.ModifyIncomingDamage != nil {
+		finalDamage, reflectDamage = p.Char.Def.Hooks.ModifyIncomingDamage(finalDamage, detail, p.Char.ExtraState)
+	}
+
 	// HPEnergyShared：受伤时同步扣除能量（不低于 0）
 	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.HPEnergyShared {
 		p.Energy = max(p.Energy-finalDamage, 0)
@@ -715,6 +721,47 @@ func (e *Engine) applyDamageFull(sourceSeat, targetSeat, amount int, detail stri
 		}
 	}
 
+	// 反弹伤害（如反伤者），使用 applyReflectDamage 避免无限递归
+	if reflectDamage > 0 && sourceSeat >= 0 && sourceSeat != targetSeat {
+		e.applyReflectDamage(targetSeat, sourceSeat, reflectDamage, "反弹伤害")
+	}
+
+	if p.HP <= 0 {
+		e.handleHPZero(targetSeat)
+	}
+}
+
+// applyReflectDamage 施加反弹伤害，不触发目标的 ModifyIncomingDamage/OnLethalCheck，
+// 防止反弹无限递归。仍触发 OnDamageReceived 等后续钩子。
+func (e *Engine) applyReflectDamage(sourceSeat, targetSeat, amount int, detail string) {
+	p := e.state.Players[targetSeat]
+
+	// 反弹伤害仍受被动减免
+	finalDamage := amount
+	if p.Char != nil {
+		finalDamage = p.Char.ModifyIncoming(finalDamage)
+	}
+
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.HPEnergyShared {
+		p.Energy = max(p.Energy-finalDamage, 0)
+	}
+
+	p.HP -= finalDamage
+
+	hpAfter := max(p.HP, 0)
+	e.room.Broadcast(protocol.MsgDamageEv, protocol.MustEncode(protocol.DamageEv{
+		AttackerSeat: sourceSeat,
+		DefenderSeat: targetSeat,
+		RawDamage:    amount,
+		FinalDamage:  finalDamage,
+		HPAfter:      hpAfter,
+		Detail:       detail,
+	}))
+
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.OnDamageReceived != nil {
+		p.Char.Def.Hooks.OnDamageReceived(finalDamage, p.Char.ExtraState)
+	}
+
 	if p.HP <= 0 {
 		e.handleHPZero(targetSeat)
 	}
@@ -740,7 +787,26 @@ func (e *Engine) handleHPZero(seat int) {
 			Energy: p.Energy, MaxEnergy: p.MaxEnergy,
 		}))
 	} else {
-		// 二次归零：检查殉道者被动拦截
+		// 二次归零：先检查 OnLethalCheck 钩子（如反伤者保命被动）
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.OnLethalCheck != nil {
+			oppSeat := 1 - seat
+			oppHP := e.state.Players[oppSeat].HP
+			survive, hpAfter, reflectDmg := p.Char.Def.Hooks.OnLethalCheck(0, p.Char.ExtraState, oppHP)
+			if survive {
+				p.HP = hpAfter
+				slog.Info("lethal check: survived", "seat", seat, "hpAfter", hpAfter)
+				e.sendPlayerStatus(seat)
+				e.room.Broadcast(protocol.MsgPlayerStatusEv, protocol.MustEncode(protocol.PlayerStatusEv{
+					Seat: seat, HP: hpAfter, MaxHP: p.MaxHP,
+					Energy: p.Energy, MaxEnergy: p.MaxEnergy,
+				}))
+				if reflectDmg > 0 {
+					e.applyReflectDamage(seat, oppSeat, reflectDmg, "反伤者被动：致死反弹")
+				}
+				return
+			}
+		}
+		// 检查殉道者被动拦截
 		if p.Char != nil && p.Char.InterceptSecondDeath() {
 			// 殉道者解放自动触发：HP 回至60，广播解放事件
 			p.HP = 60
@@ -975,6 +1041,14 @@ func (e *Engine) callPhaseStartHooks(phase string) {
 		}
 		if msg != "" {
 			slog.Info("phase start hook", "seat", seat, "phase", phase, "msg", msg)
+		}
+		// 处理钩子请求的回血（如建造者 >=3 房子被动）
+		if heal, ok := p.Char.ExtraState["pending_heal"]; ok {
+			if h, ok := heal.(int); ok && h > 0 {
+				p.HP = min(p.HP+h, p.MaxHP)
+				e.sendPlayerStatus(seat)
+			}
+			delete(p.Char.ExtraState, "pending_heal")
 		}
 	}
 }

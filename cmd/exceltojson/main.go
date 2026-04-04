@@ -251,11 +251,30 @@ var hooksParamMap = map[string]hooksParamDef{
 	"强化技能自伤":   {jsonKey: "enhanced_self_damage", dataType: "int"},
 	"普通技能自伤":   {jsonKey: "normal_self_damage", dataType: "int"},
 	"普通技能摸牌数":  {jsonKey: "normal_draw_cards", dataType: "int"},
+	// 反伤者
+	"强化免疫阶段数":  {jsonKey: "enhanced_immune_phases", dataType: "int"},
+	"解放技能消耗":   {jsonKey: "lib_cost", dataType: "int"},
+	"解放技能点数阈值": {jsonKey: "lib_pts_threshold", dataType: "int"},
+	"解放免疫阶段数":  {jsonKey: "lib_immune_phases", dataType: "int"},
+	// 建造者
+	"工人基础效率":   {jsonKey: "base_worker_eff", dataType: "int"},
+	"一层房效率加成":  {jsonKey: "house1_eff_bonus", dataType: "int"},
+	"二层房减伤":    {jsonKey: "house2_dmg_reduction", dataType: "int"},
+	"三层房回血":    {jsonKey: "house3_heal", dataType: "int"},
+	"房子减半伤害阈值": {jsonKey: "damage_halve_threshold", dataType: "int"},
+	"解放最低房子数":  {jsonKey: "lib_house_threshold", dataType: "int"},
+	"解放最低点数":   {jsonKey: "lib_pts_min", dataType: "int"},
+	"解放最高点数":   {jsonKey: "lib_pts_max", dataType: "int"},
 }
 
 // "强化技能点数阈值" 在血魔中对应 enhanced_pts_threshold 而非 enhanced_skill_pts_threshold
 // 需要按角色区分的参数映射
 var hooksParamOverrides = map[string]map[string]string{
+	"反伤者": {
+		"普通技能消耗":   "normal_cost",
+		"强化技能消耗":   "enhanced_cost",
+		"强化技能点数阈值": "enhanced_pts_threshold",
+	},
 	"血魔": {
 		"强化技能点数阈值": "enhanced_pts_threshold",
 	},

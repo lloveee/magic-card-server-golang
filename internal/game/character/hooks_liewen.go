@@ -59,6 +59,14 @@ func init() {
 				}, cost, true
 			},
 
+			BuildExtraInfo: func(es map[string]any) map[string]any {
+				cfg := HooksConfig("liewen")
+				return map[string]any{
+					"rifts":      esInt(es, "rifts", 0),
+					"rift_bonus": esInt(es, "rift_bonus", hcInt(cfg, "default_rift_bonus", LiewenDefaultRiftBonus)),
+				}
+			},
+
 			OnAttackLaunched: func(attackPoints int, energy int, es map[string]any) (int, int) {
 				cfg := HooksConfig("liewen")
 				threshold := hcInt(cfg, "liberation_energy_threshold", 100)
