@@ -73,23 +73,31 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 	// 手牌区：完整内容（含槽位编号，客户端用于 UI 排列）
 	for _, sc := range p.Hand.HandSlottedCards() {
 		pts := applyModifiedPoints(sc.Card.Points, sc.Card, p)
-		view.Hand = append(view.Hand, protocol.CardView{
+		cv := protocol.CardView{
 			Slot:     sc.Slot,
 			Faction:  sc.Card.SubFaction.String(),
 			CardType: sc.Card.CardType.String(),
 			Points:   protocol.IntPtr(pts),
-		})
+		}
+		if pts != sc.Card.Points {
+			cv.RawPoints = protocol.IntPtr(sc.Card.Points)
+		}
+		view.Hand = append(view.Hand, cv)
 	}
 
 	// 合成区：完整内容
 	for _, sc := range p.Hand.SynthSlottedCards() {
 		pts := applyModifiedPoints(sc.Card.Points, sc.Card, p)
-		view.SynthZone = append(view.SynthZone, protocol.CardView{
+		cv := protocol.CardView{
 			Slot:     sc.Slot,
 			Faction:  sc.Card.SubFaction.String(),
 			CardType: sc.Card.CardType.String(),
 			Points:   protocol.IntPtr(pts),
-		})
+		}
+		if pts != sc.Card.Points {
+			cv.RawPoints = protocol.IntPtr(sc.Card.Points)
+		}
+		view.SynthZone = append(view.SynthZone, cv)
 	}
 
 	// 填充角色特定的额外状态（供客户端在UI上展示）
@@ -114,7 +122,7 @@ func buildOpponentView(p *PlayerState) protocol.OpponentView {
 		}
 	}
 
-	return protocol.OpponentView{
+	oppView := protocol.OpponentView{
 		Seat:        p.Seat,
 		HP:          p.HP,
 		MaxHP:       p.MaxHP,
@@ -127,4 +135,13 @@ func buildOpponentView(p *PlayerState) protocol.OpponentView {
 		// 注意：对手的 Hand 和 SynthZone 内容字段根本不存在于 OpponentView 里。
 		// 不是空切片，是字段压根不存在，Godot 客户端永远拿不到对手手牌内容。
 	}
+
+	// 对手角色的公开状态（护盾、房子等对方可见信息）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.BuildPublicExtra != nil {
+		if info := p.Char.Def.Hooks.BuildPublicExtra(p.Char.ExtraState); info != nil {
+			oppView.PublicExtra = info
+		}
+	}
+
+	return oppView
 }

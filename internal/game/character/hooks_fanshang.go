@@ -7,16 +7,17 @@ import (
 
 func init() {
 	// 反伤者：反弹/免疫体系角色。
-	// 被动：致死伤害时若反弹可杀死对手，自身残留1血（一局一次）。
-	// 普通技能（未合成技能牌）：消耗能量，反弹下一次攻击伤害。
+	// 被动：受到致命伤害时锁血1，将累计格挡/反弹的伤害全部反弹给对手（一局一次）。
+	// 普通技能（未合成技能牌）：消耗能量，获得1层反弹层数（上限5），受攻击时消耗1层并反弹。
 	// 强化技能（合成技能牌）：消耗能量，免疫技能伤害若干阶段。
 	// 解放技（25点技能牌）：消耗能量，免疫并反弹所有伤害若干回合。
 	//
 	// ExtraState:
-	//   "reflect_next"       bool  - 下次受到攻击时反弹
+	//   "reflect_stacks"      int  - 反弹层数(0-5)，每层可反弹一次攻击
+	//   "accumulated_blocked" int  - 技能1/2累计格挡/反弹的伤害总量
 	//   "skill_immune_phases" int  - 剩余技能免疫阶段数
 	//   "lib_immune_phases"   int  - 剩余全免疫+反弹阶段数（每回合=5个phase）
-	//   "lethal_save_used"   bool  - 被动保命已使用
+	//   "lethal_save_used"    bool - 被动保命已使用
 
 	registry["fanshang"] = &CharDef{
 		ID: "fanshang",
@@ -48,19 +49,26 @@ func init() {
 			ModifyIncomingDamage: func(damage int, damageType string, es map[string]any) (int, int) {
 				// 优先级1：解放免疫（全类型免疫+反弹）
 				if esInt(es, "lib_immune_phases", 0) > 0 {
+					acc := esInt(es, "accumulated_blocked", 0)
+					es["accumulated_blocked"] = acc + damage
 					return 0, damage // 完全免疫，全额反弹
 				}
 
 				// 优先级2：技能免疫（仅技能伤害）
 				if esInt(es, "skill_immune_phases", 0) > 0 && damageType == "skill direct" {
-					return 0, 0 // 免疫技能伤害，不反弹
+					acc := esInt(es, "accumulated_blocked", 0)
+					es["accumulated_blocked"] = acc + damage
+					return 0, 0 // 免疫技能伤害，不即时反弹（累计到被动）
 				}
 
-				// 优先级3：反弹下次攻击
+				// 优先级3：反弹层数（仅攻击伤害）
 				isAttack := strings.Contains(damageType, "攻击") || strings.Contains(damageType, "attack")
-				if esBool(es, "reflect_next", false) && isAttack {
-					es["reflect_next"] = false // 消耗一次性反弹
-					return 0, damage           // 免疫并反弹
+				stacks := esInt(es, "reflect_stacks", 0)
+				if stacks > 0 && isAttack {
+					es["reflect_stacks"] = stacks - 1 // 消耗一层
+					acc := esInt(es, "accumulated_blocked", 0)
+					es["accumulated_blocked"] = acc + damage
+					return 0, damage // 免疫并反弹
 				}
 
 				return damage, 0 // 正常受伤
@@ -70,22 +78,21 @@ func init() {
 				if esBool(es, "lethal_save_used", false) {
 					return false, 0, 0 // 已用过
 				}
-				// 被动：如果此次致死伤害足以同时杀死对手，则自身残留1血并反弹
-				// "若反伤可致死对手" → 致死伤害值 >= 对手当前HP
-				cfg := HooksConfig("fanshang")
-				_ = cfg
-				// 这里的 damage 参数未使用（handleHPZero 传 0），我们直接看对手HP是否脆弱
-				// 实际判定：当前受到的这次攻击伤害如果反弹，能否致死对手
-				// 由于到达 OnLethalCheck 时 HP 已经 <= 0，原始伤害信息丢失
-				// 改为：直接检查对手是否处于濒死状态（合理的简化：对手也快死了才触发）
 				if opponentHP <= 0 {
-					return false, 0, 0 // 对手已死，无意义
+					return false, 0, 0 // 对手已死
 				}
-				// 触发保命：残留1血，不进行反弹（被动的反弹是概念性的——代表"同归于尽"的威慑）
-				// 实际实现：自身存活1血，对对手造成等额伤害
+
+				// 被动：受到致命伤害时锁血1，将累计格挡的所有伤害反弹给对手
 				es["lethal_save_used"] = true
-				// 反弹伤害 = 对手当前HP（确保能致死对手）
-				return true, 1, opponentHP
+				accDmg := esInt(es, "accumulated_blocked", 0)
+				es["accumulated_blocked"] = 0 // 清空累计
+
+				// 反弹伤害 = 累计格挡量（至少1，确保有意义）
+				reflectDmg := accDmg
+				if reflectDmg < 1 {
+					reflectDmg = 1
+				}
+				return true, 1, reflectDmg
 			},
 
 			UseSkillOverride: func(pts int, es map[string]any) (*SkillResult, int, bool) {
@@ -93,10 +100,11 @@ func init() {
 
 				libPtsThreshold := hcInt(cfg, "lib_pts_threshold", 25)
 				enhancedPtsThreshold := hcInt(cfg, "enhanced_pts_threshold", 3)
+				maxReflectStacks := hcInt(cfg, "max_reflect_stacks", 5)
 
 				if pts >= libPtsThreshold {
 					// 解放：全免疫+反弹
-					phases := hcInt(cfg, "lib_immune_phases", 10) // 2回合≈10个phase
+					phases := hcInt(cfg, "lib_immune_phases", 10)
 					es["lib_immune_phases"] = phases
 					cost := hcInt(cfg, "lib_cost", 50)
 					return &SkillResult{
@@ -116,19 +124,43 @@ func init() {
 					}, cost, true
 				}
 
-				// 普通：反弹下次攻击
-				es["reflect_next"] = true
+				// 普通：增加反弹层数（上限）
+				stacks := esInt(es, "reflect_stacks", 0)
+				if stacks >= maxReflectStacks {
+					return &SkillResult{
+						Tier: TierNormal,
+						Desc: fmt.Sprintf("反伤护盾已满（%d/%d层），无法继续叠加", stacks, maxReflectStacks),
+					}, 0, true
+				}
+				es["reflect_stacks"] = stacks + 1
 				cost := hcInt(cfg, "normal_cost", 10)
 				return &SkillResult{
 					Tier: TierNormal,
-					Desc: "反伤护盾：下一次受到的攻击伤害将被反弹给对手",
+					Desc: fmt.Sprintf("反伤护盾：获得1层反弹（当前%d/%d层），受攻击时消耗1层反弹伤害", stacks+1, maxReflectStacks),
 				}, cost, true
+			},
+
+			BuildPublicExtra: func(es map[string]any) map[string]any {
+				info := map[string]any{}
+				if v := esInt(es, "reflect_stacks", 0); v > 0 {
+					info["reflect_stacks"] = v
+				}
+				if esInt(es, "lib_immune_phases", 0) > 0 {
+					info["shielded"] = true
+				}
+				if len(info) == 0 {
+					return nil
+				}
+				return info
 			},
 
 			BuildExtraInfo: func(es map[string]any) map[string]any {
 				info := map[string]any{}
-				if esBool(es, "reflect_next", false) {
-					info["reflect_next"] = true
+				if v := esInt(es, "reflect_stacks", 0); v > 0 {
+					info["reflect_stacks"] = v
+				}
+				if v := esInt(es, "accumulated_blocked", 0); v > 0 {
+					info["accumulated_blocked"] = v
 				}
 				if v := esInt(es, "skill_immune_phases", 0); v > 0 {
 					info["skill_immune_phases"] = v

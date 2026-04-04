@@ -65,6 +65,8 @@ type OpponentView struct {
 	IsNearDeath bool   `json:"is_near_death"`
 	HandCount   int    `json:"hand_count"`  // 对手手牌张数（数量公开，内容不公开）
 	SynthCount  int    `json:"synth_count"` // 对手合成区张数
+	// PublicExtra 对手角色的公开状态（护盾层数、房子数等可见信息）
+	PublicExtra map[string]any `json:"public_extra,omitempty"`
 }
 
 // CardView 是一张牌对某位玩家呈现的样子。
@@ -77,10 +79,11 @@ type OpponentView struct {
 //   - 虚幻之境·虚 场地效果下，自己手中的非虚幻牌（对手视角的隐藏）
 //   - 虚幻之境·实 场地效果下，新抽到的虚幻牌（结算时才揭示，+2 后最高 7 点）
 type CardView struct {
-	Slot     int    `json:"slot"`
-	Faction  string `json:"faction"`   // "梦幻" or "重回"
-	CardType string `json:"card_type"` // "攻击" or "技能" or "能耗"
-	Points   *int   `json:"points"`    // nil = 点数隐藏
+	Slot      int    `json:"slot"`
+	Faction   string `json:"faction"`   // "梦幻" or "重回"
+	CardType  string `json:"card_type"` // "攻击" or "技能" or "能耗"
+	Points    *int   `json:"points"`    // nil = 点数隐藏（显示用，含角色被动加成）
+	RawPoints *int   `json:"raw_points,omitempty"` // 合成用原始点数（无被动修正），与 Points 不同时才发送
 }
 
 // ════════════════════════════════════════════════════════════════

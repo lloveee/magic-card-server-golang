@@ -252,6 +252,7 @@ var hooksParamMap = map[string]hooksParamDef{
 	"普通技能自伤":   {jsonKey: "normal_self_damage", dataType: "int"},
 	"普通技能摸牌数":  {jsonKey: "normal_draw_cards", dataType: "int"},
 	// 反伤者
+	"反弹层数上限":   {jsonKey: "max_reflect_stacks", dataType: "int"},
 	"强化免疫阶段数":  {jsonKey: "enhanced_immune_phases", dataType: "int"},
 	"解放技能消耗":   {jsonKey: "lib_cost", dataType: "int"},
 	"解放技能点数阈值": {jsonKey: "lib_pts_threshold", dataType: "int"},

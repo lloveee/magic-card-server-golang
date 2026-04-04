@@ -68,6 +68,10 @@ type CharHooks struct {
 	// 引擎在构建 PlayerView 时调用，返回 nil 表示无额外信息。
 	BuildExtraInfo func(es map[string]any) map[string]any
 
+	// BuildPublicExtra 返回对手也能看到的公开状态（护盾层数、房子数等）。
+	// 引擎在构建 OpponentView 时调用，返回 nil 表示无公开信息。
+	BuildPublicExtra func(es map[string]any) map[string]any
+
 	// ── 技能覆盖 ─────────────────────────────────────────────────
 
 	// UseSkillOverride 替换默认的技能档位判定逻辑（若设置）。
