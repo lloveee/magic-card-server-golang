@@ -91,6 +91,16 @@ type CharHooks struct {
 	// UseSkillOverride 替换默认的技能档位判定逻辑（若设置）。
 	// 返回 (result, cost, handled)。handled=false 则回退到普通/强化默认逻辑。
 	UseSkillOverride func(cardPoints int, es map[string]any) (result *SkillResult, cost int, handled bool)
+
+	// PreUseSkillCheck 在技能牌取出后、UseSkill 调用前进行前置校验。
+	// 返回非 nil error 时引擎拒绝这次出牌：将牌放回原槽位，并把错误消息发给玩家。
+	// 用途：节律者要求本回合每次技能点数不得低于上一次。
+	PreUseSkillCheck func(cardPoints int, es map[string]any) error
+
+	// MaxHandSize 在补牌阶段（Fill）调用，返回该角色当前的手牌上限。
+	// 返回值会被引擎 clamp 到 [1, HandZoneSize]；返回 0 表示沿用引擎默认（HandZoneSize 或濒死 SafeZoneSize）。
+	// 引擎传入当前能量值，便于实现"手牌上限=能量"等动态被动。
+	MaxHandSize func(es map[string]any, energy int) int
 }
 
 // esInt 从 ExtraState 读取 int 值，键不存在或类型不符时返回 defVal。

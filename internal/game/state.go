@@ -86,10 +86,16 @@ func newPlayerState(seat int) *PlayerState {
 }
 
 // drawCards 补充手牌至 n 张（正常 8，濒死 4）。
+// 角色钩子 MaxHandSize 可进一步压低上限（如节律者：上限=能量值）。
 func (p *PlayerState) drawCards() {
 	maxSlots := card.HandZoneSize
 	if p.IsNearDeath {
 		maxSlots = card.SafeZoneSize // 濒死只能补安全区
+	}
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.MaxHandSize != nil {
+		if n := p.Char.Def.Hooks.MaxHandSize(p.Char.ExtraState, p.Energy); n > 0 && n < maxSlots {
+			maxSlots = n
+		}
 	}
 	p.Hand.Fill(p.Deck, maxSlots)
 }
