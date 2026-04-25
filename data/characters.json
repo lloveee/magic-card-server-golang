@@ -346,5 +346,58 @@
     "name": "积怨者",
     "normal": {},
     "passive": {}
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "all_cards_as_attack": true,
+      "dark_damage": 10,
+      "dual_multiplier": 2,
+      "light_heal": 10,
+      "unlock_threshold": 50
+    },
+    "id": "mingan",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 90,
+    "name": "明暗者",
+    "normal": {},
+    "passive": {}
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "double_mark_damage": 20,
+      "liberation_trigger_count": 3,
+      "max_marks_per_turn": 3,
+      "single_mark_damage": 10,
+      "single_mark_heal": 10
+    },
+    "id": "keyin",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 90,
+    "name": "刻印者",
+    "normal": {},
+    "passive": {}
+  },
+  {
+    "enhanced": {},
+    "hooks_config": {
+      "skill_energy_cost": 1
+    },
+    "id": "jielv",
+    "lib": {},
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "max_energy": 100,
+    "max_hp": 95,
+    "name": "节律者",
+    "normal": {},
+    "passive": {}
   }
 ]

@@ -61,6 +61,18 @@ var HooksParamMap = map[string]ParamDef{
 	// 积怨者
 	"解锁伤害阈值": {JSONKey: "unlock_threshold", DataType: "int"},
 	"解锁后补抽数": {JSONKey: "unlocked_draw", DataType: "int"},
+	// 明暗者（"解锁伤害阈值" / unlock_threshold 与积怨者共享中文名 + JSON key）
+	"光形态回血":   {JSONKey: "light_heal", DataType: "int"},
+	"暗形态对敌伤害": {JSONKey: "dark_damage", DataType: "int"},
+	"双形态倍率":   {JSONKey: "dual_multiplier", DataType: "int"},
+	// 刻印者
+	"每回合最大印记层数": {JSONKey: "max_marks_per_turn", DataType: "int"},
+	"单印记伤害":     {JSONKey: "single_mark_damage", DataType: "int"},
+	"单印记回血":     {JSONKey: "single_mark_heal", DataType: "int"},
+	"双印记伤害":     {JSONKey: "double_mark_damage", DataType: "int"},
+	"解放引爆次数":    {JSONKey: "liberation_trigger_count", DataType: "int"},
+	// 节律者
+	"技能能量消耗": {JSONKey: "skill_energy_cost", DataType: "int"},
 }
 
 // HooksParamOverrides 当同一个中文名在不同角色映射到不同 JSON key 时使用。
@@ -123,6 +135,18 @@ var HooksParamNotes = map[string]string{
 	// 积怨者
 	"解锁伤害阈值": "任一原始牌型累计伤害达到此值，该牌型攻击转为不可防御",
 	"解锁后补抽数": "解锁牌型成功命中后补抽的牌数",
+	// 明暗者
+	"光形态回血":   "解锁光形态后每回合行动阶段开始时回复的生命值",
+	"暗形态对敌伤害": "解锁暗形态后每回合行动阶段开始时对敌方造成的伤害",
+	"双形态倍率":   "光暗双形态同时解锁时，回血与对敌伤害各乘以该倍率",
+	// 刻印者
+	"每回合最大印记层数": "刻印者每回合最多施加的印记层数（栈上限）",
+	"单印记伤害":     "引爆单印记时对敌造成的伤害",
+	"单印记回血":     "引爆单印记时自身回复的生命值",
+	"双印记伤害":     "引爆双印记时对敌造成的伤害",
+	"解放引爆次数":    "累计成功引爆达到此值后，解放被动解锁",
+	// 节律者
+	"技能能量消耗": "节律者每次使用技能牌固定消耗的能量",
 }
 
 // CharOrder 是 Excel 各 sheet 默认的角色排列顺序（与 gen_template.go 保持一致）。
@@ -130,6 +154,7 @@ var HooksParamNotes = map[string]string{
 var CharOrder = []string{
 	"力裁者", "镜换者", "空手者", "噬渊者", "灼血者", "殉道者",
 	"时空裂缝者", "万能者", "血魔", "反伤者", "建造者", "积怨者",
+	"明暗者", "刻印者", "节律者",
 }
 
 // HooksParamOrder 是反向生成"特殊机制"sheet 时，每个角色内部参数行的稳定排序权重。
@@ -150,6 +175,12 @@ var HooksParamOrder = []string{
 	"解放最低房子数", "解放最低点数", "解放最高点数",
 	// 积怨者
 	"解锁伤害阈值", "解锁后补抽数",
+	// 明暗者
+	"光形态回血", "暗形态对敌伤害", "双形态倍率",
+	// 刻印者
+	"每回合最大印记层数", "单印记伤害", "单印记回血", "双印记伤害", "解放引爆次数",
+	// 节律者
+	"技能能量消耗",
 }
 
 // ParamOrderIndex 把 HooksParamOrder 转成 中文名 → 序号 的查表，便于排序时 O(1) 查询。

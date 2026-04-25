@@ -772,13 +772,51 @@ func (e *Engine) applyAttackDamage(sourceSeat, targetSeat, amount int, detail st
 		return
 	}
 	src := e.state.Players[sourceSeat]
-	if src.Char == nil || src.Char.Def.Hooks == nil || src.Char.Def.Hooks.OnAttackHit == nil {
+	if src.Char != nil && src.Char.Def.Hooks != nil && src.Char.Def.Hooks.OnAttackHit != nil {
+		draw := src.Char.Def.Hooks.OnAttackHit(finalDamage, src.Char.ExtraState)
+		if draw > 0 {
+			src.Hand.DrawIntoHand(src.Deck, draw)
+			e.sendStateTo(sourceSeat, "OnAttackHit draw")
+		}
+	}
+	// 钩子函数只能修改 ExtraState；这里把它们请求的"对对手追加伤害 / 自身回血"实际落地。
+	// 用途：刻印者引爆印记（OnDamageDealt 内写 pending_*）。
+	e.applyHookPending(sourceSeat)
+}
+
+// applyHookPending 处理角色钩子通过 ExtraState 请求的"对对手伤害 / 自身回血"。
+// character 包零依赖于 engine，所以钩子只能往 ExtraState 写意图，由此处实际执行。
+// 处理后会清空相应的 pending_* 字段，避免重复触发。
+func (e *Engine) applyHookPending(seat int) {
+	if seat < 0 || seat >= len(e.state.Players) {
 		return
 	}
-	draw := src.Char.Def.Hooks.OnAttackHit(finalDamage, src.Char.ExtraState)
-	if draw > 0 {
-		src.Hand.DrawIntoHand(src.Deck, draw)
-		e.sendStateTo(sourceSeat, "OnAttackHit draw")
+	p := e.state.Players[seat]
+	if p == nil || p.Char == nil {
+		return
+	}
+	es := p.Char.ExtraState
+
+	// 对对手追加伤害（走完整钩子链：减免、反伤、OnDamageReceived 等）
+	if v, ok := es["pending_opp_damage"]; ok {
+		if dmg, ok := v.(int); ok && dmg > 0 {
+			label := "钩子追加伤害"
+			if s, ok := es["pending_opp_damage_label"].(string); ok && s != "" {
+				label = s
+			}
+			e.applyDamageFull(seat, 1-seat, dmg, label)
+		}
+		delete(es, "pending_opp_damage")
+		delete(es, "pending_opp_damage_label")
+	}
+
+	// 自身回血（不超过 MaxHP）
+	if v, ok := es["pending_heal"]; ok {
+		if heal, ok := v.(int); ok && heal > 0 {
+			p.HP = min(p.HP+heal, p.MaxHP)
+			e.sendPlayerStatus(seat)
+		}
+		delete(es, "pending_heal")
 	}
 }
 
@@ -1093,14 +1131,9 @@ func (e *Engine) callPhaseStartHooks(phase string) {
 		if msg != "" {
 			slog.Info("phase start hook", "seat", seat, "phase", phase, "msg", msg)
 		}
-		// 处理钩子请求的回血（如建造者 >=3 房子被动）
-		if heal, ok := p.Char.ExtraState["pending_heal"]; ok {
-			if h, ok := heal.(int); ok && h > 0 {
-				p.HP = min(p.HP+h, p.MaxHP)
-				e.sendPlayerStatus(seat)
-			}
-			delete(p.Char.ExtraState, "pending_heal")
-		}
+		// 处理钩子请求的回血与对对手伤害
+		// （建造者 >=3 房回血 / 明暗者光暗形态 / 刻印者解放被动自动引爆）
+		e.applyHookPending(seat)
 	}
 }
 
@@ -1138,6 +1171,14 @@ func (e *Engine) activateSkillCard(seat int, c *card.Card, putBack func()) bool 
 		putBack()
 		e.sendError(seat, protocol.ErrCodeInvalidPhase, "尚未选择角色")
 		return false
+	}
+	// 钩子前置校验：节律者要求本回合点数不得低于上一次。
+	if p.Char.Def.Hooks != nil && p.Char.Def.Hooks.PreUseSkillCheck != nil {
+		if err := p.Char.Def.Hooks.PreUseSkillCheck(c.Points, p.Char.ExtraState); err != nil {
+			putBack()
+			e.sendError(seat, protocol.ErrCodeInvalidPhase, err.Error())
+			return false
+		}
 	}
 	result, cost, err := p.Char.UseSkill(c.Points)
 	if err != nil {
