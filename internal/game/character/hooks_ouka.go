@@ -6,29 +6,29 @@ import (
 )
 
 func init() {
-	// 建造者：召唤小人盖房子的经营型角色。
+	// 建造者：召唤人偶盖房子的经营型角色。
 	// 被动：技能牌点数 = 能量消耗。根据房子数量解锁并叠加被动。
-	//   阶段一(>1房子)：每层房子每回合增加 +2 名小人效率
+	//   阶段一(>1房子)：每层房子每回合增加 +2 名工人数量
 	//   阶段二(>2房子)：每层房子增加 +2 减伤
 	//   阶段三(>=3房子)：每层房子每回合回血 +5
 	//   受到单次 >20 伤害：房子数量减半（向上取整）
-	// 普通技能：按技能牌点数召唤等量小人，消耗等量能量。
-	// 解放技（>=5房子，20-25点技能牌）：扣除所有房子，小人翻倍+效率翻倍。
+	// 普通技能：按技能牌点数召唤等量人偶，消耗等量能量。
+	// 解放技（>=5房子，20-25点技能牌）：扣除所有房子，人偶翻倍+效率翻倍。
 	//
 	// ExtraState:
-	//   "workers"        int - 小人数量
+	//   "workers"        int - 人偶数量
 	//   "build_progress" int - 当前房子进度(0-99)
 	//   "houses"         int - 已完成房子数
 	//   "eff_mult"       int - 效率倍率(默认1，解放后2)
 
-	registry["jianzao"] = &CharDef{
-		ID: "jianzao",
+	registry["ouka"] = &CharDef{
+		ID: "ouka",
 		Hooks: &CharHooks{
 			OnPhaseStart: func(phase string, es map[string]any) (int, string) {
 				if phase != "action" {
 					return 0, ""
 				}
-				cfg := HooksConfig("jianzao")
+				cfg := HooksConfig("ouka")
 				workers := esInt(es, "workers", 0)
 				if workers == 0 {
 					return 0, ""
@@ -38,12 +38,15 @@ func init() {
 				progress := esInt(es, "build_progress", 0)
 				effMult := esInt(es, "eff_mult", 1)
 
-				// 计算每工人效率：基础1 + 房子数量 × 效率加成
-				baseEff := hcInt(cfg, "base_worker_eff", 1)
+				// >1房子：每回合增加工人数量
 				if houses > 1 {
-					effBonus := hcInt(cfg, "house1_eff_bonus", 2)
-					baseEff += houses * effBonus // 每层房子增加效率
+					workerBonus := hcInt(cfg, "house1_worker_bonus", 2)
+					newWorkers := houses * workerBonus
+					es["workers"] = workers + newWorkers
+					workers = workers + newWorkers
 				}
+				// 基础效率计算
+				baseEff := hcInt(cfg, "base_worker_eff", 1)
 				totalWork := workers * baseEff * effMult
 				progress += totalWork
 
@@ -66,10 +69,10 @@ func init() {
 
 				var msg string
 				if newHouses > 0 {
-					msg = fmt.Sprintf("小人建造报告：%d工人产出%d进度，完成%d栋新房（共%d栋），剩余进度%d/100",
+					msg = fmt.Sprintf("人偶建造报告：%d工人产出%d进度，完成%d栋新房（共%d栋），剩余进度%d/100",
 						workers, totalWork, newHouses, houses, progress)
 				} else {
-					msg = fmt.Sprintf("小人建造报告：%d工人产出%d进度（%d/100），共%d栋房子",
+					msg = fmt.Sprintf("人偶建造报告：%d工人产出%d进度（%d/100），共%d栋房子",
 						workers, totalWork, progress, houses)
 				}
 
@@ -82,7 +85,7 @@ func init() {
 			},
 
 			ModifyIncomingDamage: func(damage int, damageType string, es map[string]any) (int, int) {
-				cfg := HooksConfig("jianzao")
+				cfg := HooksConfig("ouka")
 				houses := esInt(es, "houses", 0)
 				finalDamage := damage
 
@@ -100,7 +103,7 @@ func init() {
 			},
 
 			OnDamageReceived: func(finalDamage int, es map[string]any) {
-				cfg := HooksConfig("jianzao")
+				cfg := HooksConfig("ouka")
 				threshold := hcInt(cfg, "damage_halve_threshold", 20)
 				houses := esInt(es, "houses", 0)
 
@@ -111,7 +114,7 @@ func init() {
 			},
 
 			UseSkillOverride: func(pts int, es map[string]any) (*SkillResult, int, bool) {
-				cfg := HooksConfig("jianzao")
+				cfg := HooksConfig("ouka")
 
 				houses := esInt(es, "houses", 0)
 				libHouseThreshold := hcInt(cfg, "lib_house_threshold", 5)
@@ -129,18 +132,18 @@ func init() {
 					cost := pts
 					return &SkillResult{
 						Tier: TierLiberation,
-						Desc: fmt.Sprintf("建造者解放：献祭%d栋房子，小人翻倍至%d，工作效率翻倍",
+						Desc: fmt.Sprintf("创世解放：献祭%d栋房子，人偶翻倍至%d，工作效率翻倍",
 							sacrificed, workers*2),
 					}, cost, true
 				}
 
-				// 普通技能：召唤小人，消耗 = 点数
+				// 普通技能：召唤人偶，消耗 = 点数
 				workers := esInt(es, "workers", 0)
 				es["workers"] = workers + pts
 				cost := pts
 				return &SkillResult{
 					Tier: TierNormal,
-					Desc: fmt.Sprintf("召唤小人：召唤了%d名小人（现有%d名），开始建造", pts, workers+pts),
+					Desc: fmt.Sprintf("人偶召唤：召唤了%d名人偶（现有%d名），开始建造", pts, workers+pts),
 				}, cost, true
 			},
 

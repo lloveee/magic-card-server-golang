@@ -2,13 +2,13 @@ package character
 
 func init() {
 	// 万能者：所有手牌均视为攻击牌；无技能；造成累积伤害后被动逐步强化。
-	registry["wanneng"] = &CharDef{
-		ID: "wanneng",
+	registry["mutsuki"] = &CharDef{
+		ID: "mutsuki",
 		Hooks: &CharHooks{
 			AllCardsAsAttack: true,
 
 			OnDamageDealt: func(dmg int, es map[string]any) {
-				cfg := HooksConfig("wanneng")
+				cfg := HooksConfig("mutsuki")
 				thresholds := hcIntSlice(cfg, "phase_thresholds", []int{10, 50, 100})
 
 				total := esInt(es, "total_damage", 0) + dmg
@@ -26,7 +26,7 @@ func init() {
 			},
 
 			ModifyCardPoints: func(pts int, es map[string]any) int {
-				cfg := HooksConfig("wanneng")
+				cfg := HooksConfig("mutsuki")
 				bonus := hcInt(cfg, "phase2_card_bonus", 2)
 				if esInt(es, "phase", 0) >= 2 {
 					return pts + bonus
@@ -35,7 +35,7 @@ func init() {
 			},
 
 			ModifyOutgoingAttack: func(pts int, energy int, es map[string]any) int {
-				cfg := HooksConfig("wanneng")
+				cfg := HooksConfig("mutsuki")
 				phase := esInt(es, "phase", 0)
 				if phase >= 1 {
 					pts += hcInt(cfg, "phase1_attack_bonus", 2)

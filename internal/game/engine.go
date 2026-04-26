@@ -307,6 +307,11 @@ func (e *Engine) runAction() bool {
 	resetTimer()
 
 	for {
+		// 游戏已结束（行动中触发的死亡）→ 立刻退出，让外层走清理流程，避免阻塞房间释放
+		if e.state.isOver() {
+			return true
+		}
+
 		// AI 行动检查：若当前轮到 AI（行动或防御），同步执行后 continue
 		if e.aiSeat >= 0 {
 			if e.maybeRunAIAction() {
@@ -481,6 +486,8 @@ func (e *Engine) handlePlayCard(seat int, payload []byte) {
 	effectiveType := c.CardType
 	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.AllCardsAsAttack {
 		effectiveType = card.TypeAttack
+		// 该被动会改变所有出牌的行为，对手能直接观察到，因此一打牌就公开角色身份
+		p.CharRevealed = true
 	}
 
 	switch effectiveType {
