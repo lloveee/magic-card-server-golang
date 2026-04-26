@@ -5,8 +5,8 @@ import "fmt"
 func init() {
 	// 时空裂缝者：HP/能量共享，通过裂缝被动积累能量，攻击可消耗超量能量强化伤害。
 	// 数值参数从 hooks_config（JSON）读取，行为逻辑保留在 Go 代码中。
-	registry["liewen"] = &CharDef{
-		ID: "liewen",
+	registry["shigure"] = &CharDef{
+		ID: "shigure",
 		Hooks: &CharHooks{
 			HPEnergyShared: true,
 			InitHP:         60,
@@ -20,7 +20,7 @@ func init() {
 				if rifts == 0 {
 					return 0, ""
 				}
-				cfg := HooksConfig("liewen")
+				cfg := HooksConfig("shigure")
 				bonus := esInt(es, "rift_bonus", hcInt(cfg, "default_rift_bonus", 3))
 				delta := rifts * bonus
 				return delta, fmt.Sprintf("时空裂缝（%d条）提供 %d 点能量", rifts, delta)
@@ -34,7 +34,7 @@ func init() {
 			},
 
 			UseSkillOverride: func(pts int, es map[string]any) (*SkillResult, int, bool) {
-				cfg := HooksConfig("liewen")
+				cfg := HooksConfig("shigure")
 				threshold := hcInt(cfg, "enhanced_skill_pts_threshold", 3)
 
 				if pts < threshold {
@@ -60,7 +60,7 @@ func init() {
 			},
 
 			BuildExtraInfo: func(es map[string]any) map[string]any {
-				cfg := HooksConfig("liewen")
+				cfg := HooksConfig("shigure")
 				return map[string]any{
 					"rifts":      esInt(es, "rifts", 0),
 					"rift_bonus": esInt(es, "rift_bonus", hcInt(cfg, "default_rift_bonus", LiewenDefaultRiftBonus)),
@@ -68,7 +68,7 @@ func init() {
 			},
 
 			OnAttackLaunched: func(attackPoints int, energy int, es map[string]any) (int, int) {
-				cfg := HooksConfig("liewen")
+				cfg := HooksConfig("shigure")
 				threshold := hcInt(cfg, "liberation_energy_threshold", 100)
 				if energy < threshold {
 					return 0, 0

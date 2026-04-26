@@ -2,15 +2,15 @@ package character
 
 func init() {
 	// 血魔：自伤换资源；被累积伤害 50 后攻击牌面 +3；25 点技能激活吸血被动。
-	registry["xuemo"] = &CharDef{
-		ID: "xuemo",
+	registry["momiji"] = &CharDef{
+		ID: "momiji",
 		Hooks: &CharHooks{
 			OnDamageReceived: func(dmg int, es map[string]any) {
 				es["dmg_received"] = esInt(es, "dmg_received", 0) + dmg
 			},
 
 			ModifyCardPoints: func(pts int, es map[string]any) int {
-				cfg := HooksConfig("xuemo")
+				cfg := HooksConfig("momiji")
 				threshold := hcInt(cfg, "dmg_received_threshold", 50)
 				bonus := hcInt(cfg, "dmg_received_card_bonus", 3)
 				if esInt(es, "dmg_received", 0) >= threshold {
@@ -29,7 +29,7 @@ func init() {
 			},
 
 			OnDamageLanded: func(dmg int, es map[string]any) int {
-				cfg := HooksConfig("xuemo")
+				cfg := HooksConfig("momiji")
 				threshold := hcInt(cfg, "lifesteal_damage_threshold", 30)
 				if !esBool(es, "lifesteal", false) {
 					return 0
@@ -41,7 +41,7 @@ func init() {
 			},
 
 			UseSkillOverride: func(pts int, es map[string]any) (*SkillResult, int, bool) {
-				cfg := HooksConfig("xuemo")
+				cfg := HooksConfig("momiji")
 				activatePts := hcInt(cfg, "lifesteal_activate_pts", 25)
 				enhancedPts := hcInt(cfg, "enhanced_pts_threshold", 3)
 
