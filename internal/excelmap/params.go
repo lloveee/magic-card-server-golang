@@ -28,7 +28,8 @@ var HooksParamMap = map[string]ParamDef{
 	"强化技能消耗":   {JSONKey: "enhanced_skill_cost", DataType: "int"},
 	"强化技能点数阈值": {JSONKey: "enhanced_skill_pts_threshold", DataType: "int"},
 	"超能解放能量阈值": {JSONKey: "liberation_energy_threshold", DataType: "int"},
-	// 万能者
+			"通用强化点数阈值": {JSONKey: "enhanced_pts_threshold", DataType: "int"},
+		// 万能者
 	"全牌攻击化":   {JSONKey: "all_cards_as_attack", DataType: "bool"},
 	"阶段伤害阈值":  {JSONKey: "phase_thresholds", DataType: "int_list"},
 	"阶段1攻击加成": {JSONKey: "phase1_attack_bonus", DataType: "int"},
@@ -51,7 +52,7 @@ var HooksParamMap = map[string]ParamDef{
 	"解放免疫阶段数":  {JSONKey: "lib_immune_phases", DataType: "int"},
 	// 建造者
 	"工人基础效率":   {JSONKey: "base_worker_eff", DataType: "int"},
-	"一层房效率加成":  {JSONKey: "house1_eff_bonus", DataType: "int"},
+	"一层房工人加成":  {JSONKey: "house1_worker_bonus", DataType: "int"},
 	"二层房减伤":    {JSONKey: "house2_dmg_reduction", DataType: "int"},
 	"三层房回血":    {JSONKey: "house3_heal", DataType: "int"},
 	"房子减半伤害阈值": {JSONKey: "damage_halve_threshold", DataType: "int"},
@@ -71,6 +72,9 @@ var HooksParamMap = map[string]ParamDef{
 	"单印记回血":     {JSONKey: "single_mark_heal", DataType: "int"},
 	"双印记伤害":     {JSONKey: "double_mark_damage", DataType: "int"},
 	"解放引爆次数":    {JSONKey: "liberation_trigger_count", DataType: "int"},
+	// 结城
+	"解放首次命中伤害": {JSONKey: "lib_first_hit_damage", DataType: "int"},
+	"解放后续命中恢复": {JSONKey: "lib_subsequent_heal", DataType: "int"},
 	// 节律者
 	"技能能量消耗": {JSONKey: "skill_energy_cost", DataType: "int"},
 }
@@ -79,12 +83,12 @@ var HooksParamMap = map[string]ParamDef{
 // 例：「强化技能点数阈值」在时空裂缝者里是 enhanced_skill_pts_threshold，
 //     在血魔/反伤者里是 enhanced_pts_threshold（历史遗留命名）。
 var HooksParamOverrides = map[string]map[string]string{
-	"反伤者": {
+	"真守": {
 		"普通技能消耗":   "normal_cost",
 		"强化技能消耗":   "enhanced_cost",
 		"强化技能点数阈值": "enhanced_pts_threshold",
 	},
-	"血魔": {
+	"红叶": {
 		"强化技能点数阈值": "enhanced_pts_threshold",
 	},
 }
@@ -125,7 +129,7 @@ var HooksParamNotes = map[string]string{
 	"解放免疫阶段数": "全免疫+反弹持续的阶段数",
 	// 建造者
 	"工人基础效率":   "每个小人每阶段建造的进度（基础值）",
-	"一层房效率加成":  "超过1层房子时每层房子增加的工人效率",
+	"一层房工人加成":  "超过1层房子时每回合增加的工人数量",
 	"二层房减伤":    "超过2层房子时每层房子增加的减伤值",
 	"三层房回血":    "达到3层房子时每层房子每回合回血量",
 	"房子减半伤害阈值": "单次伤害超过此值时房子减半",
@@ -145,6 +149,9 @@ var HooksParamNotes = map[string]string{
 	"单印记回血":     "引爆单印记时自身回复的生命值",
 	"双印记伤害":     "引爆双印记时对敌造成的伤害",
 	"解放引爆次数":    "累计成功引爆达到此值后，解放被动解锁",
+	// 结城
+	"解放首次命中伤害": "四印解放后每回合首次命中造成的固定伤害",
+	"解放后续命中恢复": "四印解放后每回合非首次命中时附加的恢复量",
 	// 节律者
 	"技能能量消耗": "节律者每次使用技能牌固定消耗的能量",
 }
@@ -152,9 +159,9 @@ var HooksParamNotes = map[string]string{
 // CharOrder 是 Excel 各 sheet 默认的角色排列顺序（与 gen_template.go 保持一致）。
 // 反向生成时按此顺序输出；JSON 中存在但本表未列入的角色会按 JSON 顺序追加在末尾。
 var CharOrder = []string{
-	"力裁者", "镜换者", "空手者", "噬渊者", "灼血者", "殉道者",
-	"时空裂缝者", "万能者", "血魔", "反伤者", "建造者", "积怨者",
-	"明暗者", "刻印者", "节律者",
+	"焰", "镜花", "空音", "深宵", "茜", "圣罗",
+	"时雨", "梦月", "红叶", "真守", "樱花", "琉璃",
+	"宵", "琉奈", "律花", "结城",
 }
 
 // HooksParamOrder 是反向生成"特殊机制"sheet 时，每个角色内部参数行的稳定排序权重。
@@ -171,7 +178,7 @@ var HooksParamOrder = []string{
 	// 反伤者
 	"反弹层数上限", "解放技能消耗", "解放技能点数阈值", "强化免疫阶段数", "解放免疫阶段数",
 	// 建造者
-	"工人基础效率", "一层房效率加成", "二层房减伤", "三层房回血", "房子减半伤害阈值",
+	"工人基础效率", "一层房工人加成", "二层房减伤", "三层房回血", "房子减半伤害阈值",
 	"解放最低房子数", "解放最低点数", "解放最高点数",
 	// 积怨者
 	"解锁伤害阈值", "解锁后补抽数",
@@ -179,6 +186,8 @@ var HooksParamOrder = []string{
 	"光形态回血", "暗形态对敌伤害", "双形态倍率",
 	// 刻印者
 	"每回合最大印记层数", "单印记伤害", "单印记回血", "双印记伤害", "解放引爆次数",
+	// 结城
+	"解放首次命中伤害", "解放后续命中恢复",
 	// 节律者
 	"技能能量消耗",
 }
