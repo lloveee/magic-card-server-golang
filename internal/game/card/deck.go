@@ -60,10 +60,16 @@ func (d *Deck) Seed() int64 {
 }
 
 // Draw 从牌堆取一张随机牌。
-// 子系、功能牌型、点数均匀随机，无权重偏置。
+// 防御牌概率 1/6，其余三种类型均分 5/6。
 func (d *Deck) Draw() *Card {
 	sf := allSubFactions[d.rng.Intn(len(allSubFactions))]
-	ct := allCardTypes[d.rng.Intn(len(allCardTypes))]
+	// 防御牌概率 1/6
+	var ct CardType
+	if d.rng.Intn(6) == 0 {
+		ct = TypeDefense
+	} else {
+		ct = allCardTypes[d.rng.Intn(len(allCardTypes))]
+	}
 	pts := d.rng.Intn(MaxPoints) + MinPoints // [1, 5]
 	return New(sf, ct, pts)
 }

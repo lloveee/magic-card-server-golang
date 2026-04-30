@@ -76,9 +76,10 @@ func (sf SubFaction) String() string {
 type CardType int8
 
 const (
-	TypeAttack CardType = 0 // 攻击牌：交战阶段用，点数即伤害值
-	TypeSkill  CardType = 1 // 技能牌：持有并达到门槛时触发角色技能，使用后消耗
-	TypeEnergy CardType = 2 // 能耗牌（解放）：点数转化为等量能量值
+	TypeAttack  CardType = 0 // 攻击牌：交战阶段用，点数即伤害值
+	TypeSkill   CardType = 1 // 技能牌：持有并达到门槛时触发角色技能，使用后消耗
+	TypeEnergy  CardType = 2 // 能耗牌（解放）：点数转化为等量能量值
+	TypeDefense CardType = 3 // 防御牌：防御时完全格挡攻击，主动使用获得10点护盾
 )
 
 func (ct CardType) String() string {
@@ -89,6 +90,8 @@ func (ct CardType) String() string {
 		return "技能"
 	case TypeEnergy:
 		return "能耗"
+	case TypeDefense:
+		return "防御"
 	default:
 		return "未知"
 	}

@@ -26,22 +26,25 @@ const (
 // 内部用 0-indexed 数组存储，对外接口全部用 1-indexed。
 // nil 表示该槽位为空。
 type HandZone struct {
-	hand  [HandZoneSize]*Card  // hand[0..3] = 安全区，hand[4..7] = 弃牌区
+	hand  []*Card              // 动态手牌区：安全区 hand[0..SafeZoneSize-1]，弃牌区 hand[SafeZoneSize..]
 	synth [SynthZoneSize]*Card // 合成区
 }
 
-// NewHandZone 创建空手牌区。
+// NewHandZone 创建空手牌区（初始 8 槽位）。
 func NewHandZone() *HandZone {
-	return &HandZone{}
+	return &HandZone{hand: make([]*Card, HandZoneSize)}
 }
 
 // ════════════════════════════════════════════════════════════════
 //  手牌区操作
 // ════════════════════════════════════════════════════════════════
 
+// validHandSlot 检查手牌槽位是否有效（随动态手牌区伸缩）。
+func (h *HandZone) validHandSlot(slot int) bool { return slot >= 1 && slot <= len(h.hand) }
+
 // HandCard 返回手牌区指定槽位的牌（1-indexed），空槽返回 nil。
 func (h *HandZone) HandCard(slot int) *Card {
-	if !validHandSlot(slot) {
+	if !h.validHandSlot(slot) {
 		return nil
 	}
 	return h.hand[slot-1]
@@ -49,7 +52,7 @@ func (h *HandZone) HandCard(slot int) *Card {
 
 // PlaceHand 将牌放入手牌区指定槽位。槽位已有牌时报错。
 func (h *HandZone) PlaceHand(slot int, c *Card) error {
-	if !validHandSlot(slot) {
+	if !h.validHandSlot(slot) {
 		return fmt.Errorf("无效手牌槽位: %d", slot)
 	}
 	if h.hand[slot-1] != nil {
@@ -62,7 +65,7 @@ func (h *HandZone) PlaceHand(slot int, c *Card) error {
 // TakeHand 从手牌区取出指定槽位的牌（取出后槽位变空）。
 // 槽位为空时返回 nil, nil（不报错，调用方按需判断）。
 func (h *HandZone) TakeHand(slot int) (*Card, error) {
-	if !validHandSlot(slot) {
+	if !h.validHandSlot(slot) {
 		return nil, fmt.Errorf("无效手牌槽位: %d", slot)
 	}
 	c := h.hand[slot-1]
@@ -70,11 +73,12 @@ func (h *HandZone) TakeHand(slot int) (*Card, error) {
 	return c, nil
 }
 
-// Fill 将牌堆中的牌补充到手牌区，直到填满 maxSlots 个槽位（或手牌区填满）。
-// maxSlots = 8 为正常状态；濒死状态下为 4（只填安全区）。
+// Fill 将牌堆中的牌补充到手牌区，直到填满 maxSlots 个槽位。
+// 手牌区不足时自动扩容（支持手牌上限 > 8 的角色如节律者）。
 func (h *HandZone) Fill(deck *Deck, maxSlots int) {
-	if maxSlots > HandZoneSize {
-		maxSlots = HandZoneSize
+	if maxSlots > len(h.hand) {
+		// 扩容：将手牌区拉伸到 maxSlots（如节律者手牌上限=能量值）
+		h.hand = append(h.hand, make([]*Card, maxSlots-len(h.hand))...)
 	}
 	for i := 0; i < maxSlots; i++ {
 		if h.hand[i] == nil {
@@ -149,6 +153,17 @@ func (h *HandZone) PutSynth(c *Card) error {
 	return errors.New("合成区已满（最多 4 张）")
 }
 
+func (h *HandZone) PutSynthAt(c *Card, slot int) error {
+	if slot < 1 || slot > 4 {
+		return fmt.Errorf("合成槽位无效: %d（应为 1-4）", slot)
+	}
+	if h.synth[slot-1] != nil {
+		return fmt.Errorf("合成槽位 %d 已被占用", slot)
+	}
+	h.synth[slot-1] = c
+	return nil
+}
+
 // SynthCount 返回合成区当前的牌张数。
 func (h *HandZone) SynthCount() int {
 	count := 0
@@ -178,7 +193,7 @@ func (h *HandZone) AllSynthCards() []*Card {
 // MoveToSynth 将手牌区 handSlot 的牌移入合成区。
 // 安全区（1-4）和弃牌区（5-8）的牌均可移入。
 // 合成区满、或指定手牌槽位为空时报错。
-func (h *HandZone) MoveToSynth(handSlot int) error {
+func (h *HandZone) MoveToSynth(handSlot int, targetSlot int) error {
 	c, err := h.TakeHand(handSlot)
 	if err != nil {
 		return err
@@ -186,10 +201,15 @@ func (h *HandZone) MoveToSynth(handSlot int) error {
 	if c == nil {
 		return fmt.Errorf("手牌槽位 %d 为空", handSlot)
 	}
-	if err := h.PutSynth(c); err != nil {
-		// 合成区满，原路放回
+	var putErr error
+	if targetSlot > 0 {
+		putErr = h.PutSynthAt(c, targetSlot)
+	} else {
+		putErr = h.PutSynth(c)
+	}
+	if putErr != nil {
 		h.hand[handSlot-1] = c
-		return err
+		return putErr
 	}
 	return nil
 }
@@ -279,12 +299,12 @@ func (h *HandZone) putBackToZone(zone string, slot int, c *Card) {
 }
 
 // DrawIntoHand 从牌堆抽至多 n 张牌放入手牌区的空槽。
-// 不会超过手牌区总容量，牌堆空时提前停止。
+// 不会超过手牌区当前容量，牌堆空时提前停止。
 // 返回实际抽到的张数。
 // 用途：技能/解放的"抽N张牌"效果（区别于 Fill 的"补满至N张"）。
 func (h *HandZone) DrawIntoHand(deck *Deck, n int) int {
 	drawn := 0
-	for i := 0; i < HandZoneSize && drawn < n; i++ {
+	for i := 0; i < len(h.hand) && drawn < n; i++ {
 		if h.hand[i] == nil {
 			c := deck.Draw()
 			if c == nil {
@@ -301,12 +321,12 @@ func (h *HandZone) DrawIntoHand(deck *Deck, n int) int {
 //  阶段清场
 // ════════════════════════════════════════════════════════════════
 
-// ClearDiscardZone 清空弃牌区（手牌槽位 5-8），在清场阶段调用。
-// 安全区（1-4）和合成区不受影响。
+// ClearDiscardZone 清空弃牌区（手牌槽位 SafeZoneSize+1 起），在清场阶段调用。
+// 安全区（1-SafeZoneSize）和合成区不受影响。
 // 返回被清除的牌列表（供日志或动画展示）。
 func (h *HandZone) ClearDiscardZone() []*Card {
-	discarded := make([]*Card, 0, 4)
-	for i := SafeZoneSize; i < HandZoneSize; i++ {
+	discarded := make([]*Card, 0, len(h.hand)-SafeZoneSize)
+	for i := SafeZoneSize; i < len(h.hand); i++ {
 		if h.hand[i] != nil {
 			discarded = append(discarded, h.hand[i])
 			h.hand[i] = nil
@@ -352,5 +372,4 @@ func (h *HandZone) SynthSlottedCards() []SlottedCard {
 //  辅助函数
 // ════════════════════════════════════════════════════════════════
 
-func validHandSlot(slot int) bool  { return slot >= 1 && slot <= HandZoneSize }
 func validSynthSlot(slot int) bool { return slot >= 1 && slot <= SynthZoneSize }

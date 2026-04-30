@@ -64,6 +64,7 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 		Seat:        p.Seat,
 		HP:          p.HP,
 		MaxHP:       p.MaxHP,
+		ShieldHP:    p.ShieldHP,
 		Energy:      p.Energy,
 		MaxEnergy:   p.MaxEnergy,
 		Character:   charName,
@@ -126,6 +127,7 @@ func buildOpponentView(p *PlayerState) protocol.OpponentView {
 		Seat:        p.Seat,
 		HP:          p.HP,
 		MaxHP:       p.MaxHP,
+		ShieldHP:    p.ShieldHP,
 		Energy:      p.Energy, // 能量条是公开信息（双方可见）
 		MaxEnergy:   p.MaxEnergy,
 		Character:   charName,

@@ -42,6 +42,7 @@ type PlayerView struct {
 	Seat        int        `json:"seat"`
 	HP          int        `json:"hp"`
 	MaxHP       int        `json:"max_hp"`
+	ShieldHP    int        `json:"shield_hp"`
 	Energy      int        `json:"energy"`
 	MaxEnergy   int        `json:"max_energy"`
 	Character   string     `json:"character"` // 角色名，未公开时为 "???"（但自己永远知道自己的角色）
@@ -59,6 +60,7 @@ type OpponentView struct {
 	Seat        int    `json:"seat"`
 	HP          int    `json:"hp"`
 	MaxHP       int    `json:"max_hp"`
+	ShieldHP    int    `json:"shield_hp"`
 	Energy      int    `json:"energy"` // 能量条数值双方可见（游戏设计上是公开信息）
 	MaxEnergy   int    `json:"max_energy"`
 	Character   string `json:"character"` // 暗置时 "???"，使用过技能后公开
