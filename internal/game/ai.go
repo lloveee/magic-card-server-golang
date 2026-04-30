@@ -86,10 +86,11 @@ type aiCtx struct {
 	myLibThresh  int
 	canLiberate  bool // ManualLib 且能量足够且未用过
 
-	attackCards []cardEntry // 所有攻击牌（含万能者）
-	energyCards []cardEntry // 所有能耗牌
-	skillCards  []cardEntry // 所有技能牌（手牌区）
-	synthCards  []cardEntry // 合成区中的牌（不含攻击类，供防御评估）
+	attackCards  []cardEntry // 所有攻击牌（含万能者）
+	energyCards  []cardEntry // 所有能耗牌
+	skillCards   []cardEntry // 所有技能牌（手牌区）
+	defenseCards []cardEntry // 所有防御牌
+	synthCards   []cardEntry // 合成区中的牌（不含攻击类，供防御评估）
 
 	synthOps []synthOp // 当前可立即执行的合成操作
 }
@@ -176,6 +177,8 @@ func (e *Engine) buildAICtx(seat int) aiCtx {
 			ctx.skillCards = append(ctx.skillCards, entry)
 		case c.CardType == card.TypeEnergy:
 			ctx.energyCards = append(ctx.energyCards, entry)
+		case c.CardType == card.TypeDefense:
+			ctx.defenseCards = append(ctx.defenseCards, entry)
 		}
 	}
 
@@ -368,6 +371,15 @@ func (e *Engine) scoreActions(ctx aiCtx) []aiAct {
 				score: s, desc: "能耗牌 " + ec.c.String(),
 			})
 		}
+	}
+
+	// ── 防御牌（主动使用：获得护盾） ──────────────────────────────────
+	for _, dc := range ctx.defenseCards {
+		shieldScore := 10.0 * (1.0 - ctx.myHPRatio) // 血量越低越倾向叠盾
+		acts = append(acts, aiAct{
+			kind: aiActPlayCard, zone: dc.zone, slot: dc.slot,
+			score: shieldScore, desc: "防御牌 " + dc.c.String(),
+		})
 	}
 
 	// ── 结束行动（保底，分值 0）─────────────────────────────────────
@@ -873,18 +885,30 @@ func (e *Engine) runAIDefense() {
 		if c == nil {
 			return
 		}
-		blocked := aiMin(c.Points, atkPts)
-		score := float64(blocked) * 2.0
+		var blocked int
+		var score float64
+		// 防御牌：完全格挡攻击
+		if c.CardType == card.TypeDefense {
+			blocked = atkPts
+			score = float64(atkPts) * 3.0
+			// 致命时防御牌是救命稻草
+			if wouldDie {
+				score += 10000
+			}
+		} else {
+			blocked = aiMin(c.Points, atkPts)
+			score = float64(blocked) * 2.0
 
-		// 致命时必须防御，优先用低价值牌（点数越低越省资源）
-		if wouldDie && blocked > 0 {
-			score += 8000 - float64(c.Points)*0.2
-		}
+			// 致命时必须防御，优先用低价值牌（点数越低越省资源）
+			if wouldDie && blocked > 0 {
+				score += 8000 - float64(c.Points)*0.2
+			}
 
-		// 完全格挡奖励，但浪费越多扣分越重
-		if c.Points >= atkPts {
-			wastage := c.Points - atkPts
-			score += 8 - float64(wastage)*1.5
+			// 完全格挡奖励，但浪费越多扣分越重
+			if c.Points >= atkPts {
+				wastage := c.Points - atkPts
+				score += 8 - float64(wastage)*1.5
+			}
 		}
 
 		// 机会成本：此牌作为攻击牌的价值

@@ -64,6 +64,9 @@ var ErrSameCardType = errors.New("同种牌型无法合成")
 // ErrAlreadySynthesized 是合成产物再次合成的错误，对应协议层 ErrCodeSynthAlready。
 var ErrAlreadySynthesized = errors.New("合成后的牌不能再次参与合成")
 
+// ErrDefenseCardSynthesis 是防御牌参与合成的错误。
+var ErrDefenseCardSynthesis = errors.New("防御牌不能参与合成")
+
 // Validate 检查两张牌能否合成。
 // 游戏规则约束：
 //   - 同种功能牌型（攻击+攻击、技能+技能、能耗+能耗）禁止合成
@@ -74,6 +77,9 @@ func Validate(a, b *Card) error {
 	}
 	if a.Synthesized || b.Synthesized {
 		return ErrAlreadySynthesized
+	}
+	if a.CardType == TypeDefense || b.CardType == TypeDefense {
+		return ErrDefenseCardSynthesis
 	}
 	if a.CardType == b.CardType {
 		return fmt.Errorf("%w（%s + %s）", ErrSameCardType, a.CardType, b.CardType)
@@ -109,6 +115,9 @@ func Combine(base, ingredient *Card, opts SynthesisOpts) (*Card, error) {
 		}
 		if base.Synthesized || ingredient.Synthesized {
 			return nil, ErrAlreadySynthesized
+		}
+		if base.CardType == TypeDefense || ingredient.CardType == TypeDefense {
+			return nil, ErrDefenseCardSynthesis
 		}
 	}
 

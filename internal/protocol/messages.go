@@ -215,6 +215,7 @@ type PlayerStatusEv struct {
 	Seat      int `json:"seat"`
 	HP        int `json:"hp"`
 	MaxHP     int `json:"max_hp"`
+	ShieldHP  int `json:"shield_hp"`
 	Energy    int `json:"energy"`
 	MaxEnergy int `json:"max_energy"`
 }
