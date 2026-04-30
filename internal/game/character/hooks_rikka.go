@@ -41,8 +41,7 @@ func init() {
 
 			// 替换默认技能档位：直接造成 pts 伤害 + 抽 pts 张牌，消耗 1 点能量。
 			UseSkillOverride: func(pts int, es map[string]any) (*SkillResult, int, bool) {
-				cfg := HooksConfig("rikka")
-				cost := hcInt(cfg, "skill_energy_cost", 1)
+				cost := pts // 技能消耗 = 牌面点数
 				if pts <= 0 {
 					return nil, 0, false // 不应到此处；走默认逻辑兜底
 				}

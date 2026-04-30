@@ -37,6 +37,7 @@ type PlayerState struct {
 	Seat      int
 	HP        int
 	MaxHP     int
+	ShieldHP  int // 护盾值，受伤时优先扣除（防御牌主动使用获得）
 	Energy    int
 	MaxEnergy int
 
@@ -85,16 +86,16 @@ func newPlayerState(seat int) *PlayerState {
 	}
 }
 
-// drawCards 补充手牌至 n 张（正常 8，濒死 4）。
-// 角色钩子 MaxHandSize 可进一步压低上限（如节律者：上限=能量值）。
+// drawCards 补充手牌至 maxSlots 张（正常 8，濒死 4）。
+// 角色钩子 MaxHandSize 可覆盖上限（如节律者：上限=能量值，可 > 8）。
 func (p *PlayerState) drawCards() {
 	maxSlots := card.HandZoneSize
 	if p.IsNearDeath {
 		maxSlots = card.SafeZoneSize // 濒死只能补安全区
 	}
 	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.MaxHandSize != nil {
-		if n := p.Char.Def.Hooks.MaxHandSize(p.Char.ExtraState, p.Energy); n > 0 && n < maxSlots {
-			maxSlots = n
+		if n := p.Char.Def.Hooks.MaxHandSize(p.Char.ExtraState, p.Energy); n > 0 {
+			maxSlots = n // 直接使用钩子返回值，不做上限压制
 		}
 	}
 	p.Hand.Fill(p.Deck, maxSlots)
