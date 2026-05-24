@@ -19,10 +19,10 @@ import (
 //  辅助工厂
 // ════════════════════════════════════════════════════════════════
 
-// atk / skl / eng 快速创建指定子系、指定牌型、指定点数的牌。
-func atk(sf card.SubFaction, pts int) *card.Card { return card.New(sf, card.TypeAttack, pts) }
-func skl(sf card.SubFaction, pts int) *card.Card { return card.New(sf, card.TypeSkill, pts) }
-func eng(sf card.SubFaction, pts int) *card.Card { return card.New(sf, card.TypeEnergy, pts) }
+// atk / skl / eng 快速创建指定花色、指定牌型、指定点数的牌。
+func atk(s card.Suit, pts int) *card.Card { return card.New(s, card.TypeAttack, pts) }
+func skl(s card.Suit, pts int) *card.Card { return card.New(s, card.TypeSkill, pts) }
+func eng(s card.Suit, pts int) *card.Card { return card.New(s, card.TypeEnergy, pts) }
 
 // ════════════════════════════════════════════════════════════════
 //  Combine 主规则测试
@@ -36,10 +36,10 @@ func TestCombine_SameMajor_Multiplies(t *testing.T) {
 		ingr *card.Card
 		want int
 	}{
-		{"梦境攻击×梦境技能 2×3=6", atk(card.SubDream, 2), skl(card.SubDream, 3), 6},
-		{"梦境攻击×梦境技能 2×2=4", atk(card.SubDream, 2), skl(card.SubDream, 2), 4},
-		{"虚幻攻击×虚幻能耗 1×5=5", atk(card.SubIllusion, 1), eng(card.SubIllusion, 5), 5},
-		{"重组攻击×重组技能 3×2=6", atk(card.SubReform, 3), skl(card.SubReform, 2), 6},
+		{"梦境攻击×梦境技能 2×3=6", atk(card.SuitHeart, 2), skl(card.SuitHeart, 3), 6},
+		{"梦境攻击×梦境技能 2×2=4", atk(card.SuitHeart, 2), skl(card.SuitHeart, 2), 4},
+		{"虚幻攻击×虚幻能耗 1×5=5", atk(card.SuitDiamond, 1), eng(card.SuitDiamond, 5), 5},
+		{"重组攻击×重组技能 3×2=6", atk(card.SuitClub, 3), skl(card.SuitClub, 2), 6},
 	}
 
 	for _, tc := range cases {
@@ -56,8 +56,8 @@ func TestCombine_SameMajor_Multiplies(t *testing.T) {
 			if result.CardType != tc.base.CardType {
 				t.Errorf("CardType = %v, want %v", result.CardType, tc.base.CardType)
 			}
-			if result.SubFaction != tc.base.SubFaction {
-				t.Errorf("SubFaction = %v, want %v", result.SubFaction, tc.base.SubFaction)
+			if result.Suit != tc.base.Suit {
+				t.Errorf("Suit = %v, want %v", result.Suit, tc.base.Suit)
 			}
 		})
 	}
@@ -71,9 +71,9 @@ func TestCombine_DifferentMajor_Adds(t *testing.T) {
 		ingr *card.Card
 		want int
 	}{
-		{"梦境攻击+轮回技能 2+3=5", atk(card.SubDream, 2), skl(card.SubReincarnation, 3), 5},
-		{"虚幻攻击+重组技能 3+4=7", atk(card.SubIllusion, 3), skl(card.SubReform, 4), 7},
-		{"梦境技能+重组攻击 1+1=2", skl(card.SubDream, 1), atk(card.SubReform, 1), 2},
+		{"梦境攻击+轮回技能 2+3=5", atk(card.SuitHeart, 2), skl(card.SuitSpade, 3), 5},
+		{"虚幻攻击+重组技能 3+4=7", atk(card.SuitDiamond, 3), skl(card.SuitClub, 4), 7},
+		{"梦境技能+重组攻击 1+1=2", skl(card.SuitHeart, 1), atk(card.SuitClub, 1), 2},
 	}
 
 	for _, tc := range cases {
@@ -96,9 +96,9 @@ func TestCombine_DifferentMajor_Adds(t *testing.T) {
 
 func TestCombine_SameType_ReturnsErrSameCardType(t *testing.T) {
 	pairs := [][2]*card.Card{
-		{atk(card.SubDream, 1), atk(card.SubReform, 2)},           // 攻击+攻击
-		{skl(card.SubDream, 1), skl(card.SubDream, 2)},            // 技能+技能
-		{eng(card.SubIllusion, 3), eng(card.SubReincarnation, 1)}, // 能耗+能耗
+		{atk(card.SuitHeart, 1), atk(card.SuitClub, 2)},           // 攻击+攻击
+		{skl(card.SuitHeart, 1), skl(card.SuitHeart, 2)},            // 技能+技能
+		{eng(card.SuitDiamond, 3), eng(card.SuitSpade, 1)}, // 能耗+能耗
 	}
 
 	for _, pair := range pairs {
@@ -117,8 +117,8 @@ func TestCombine_AllowSameType_NoError(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.AllowSameType = true
 
-	base := atk(card.SubDream, 2)
-	ingr := atk(card.SubReform, 3) // 不同大系，相加 = 5
+	base := atk(card.SuitHeart, 2)
+	ingr := atk(card.SuitClub, 3) // 不同大系，相加 = 5
 
 	result, err := card.Combine(base, ingr, opts)
 	if err != nil {
@@ -135,8 +135,8 @@ func TestCombine_AllowSameType_SameMajorMultiplies(t *testing.T) {
 	opts.AllowSameType = true
 
 	// 同大系同类型：2×3=6（无上限）
-	base := atk(card.SubDream, 2)
-	ingr := atk(card.SubIllusion, 3)
+	base := atk(card.SuitHeart, 2)
+	ingr := atk(card.SuitDiamond, 3)
 
 	result, err := card.Combine(base, ingr, opts)
 	if err != nil {
@@ -156,8 +156,8 @@ func TestCombine_IllusionBonus_CapAt7ForIllusion(t *testing.T) {
 	opts.IllusionBonus = true
 
 	// base 是虚幻牌，同大系乘法：3×3=9 → 上限提升至7
-	base := atk(card.SubIllusion, 3)
-	ingr := skl(card.SubIllusion, 3)
+	base := atk(card.SuitDiamond, 3)
+	ingr := skl(card.SuitDiamond, 3)
 
 	result, err := card.Combine(base, ingr, opts)
 	if err != nil {
@@ -173,8 +173,8 @@ func TestCombine_IllusionBonus_NoCapForNonIllusion(t *testing.T) {
 	opts.IllusionBonus = true
 
 	// base 是梦境牌（非虚幻），IllusionBonus 不生效，无上限：3×3=9
-	base := atk(card.SubDream, 3)
-	ingr := skl(card.SubDream, 3)
+	base := atk(card.SuitHeart, 3)
+	ingr := skl(card.SuitHeart, 3)
 
 	result, err := card.Combine(base, ingr, opts)
 	if err != nil {
@@ -194,8 +194,8 @@ func TestCombine_ReincarnAsBase_UsesReincarnPoints(t *testing.T) {
 	opts.ReincarnationRule = card.ReincarnationAsBase
 
 	// 轮回牌点数4，另一张点数2 → 结果 = 轮回牌自身 = 4
-	base := atk(card.SubReincarnation, 4)
-	ingr := skl(card.SubDream, 2)
+	base := atk(card.SuitSpade, 4)
+	ingr := skl(card.SuitHeart, 2)
 
 	result, err := card.Combine(base, ingr, opts)
 	if err != nil {
@@ -211,8 +211,8 @@ func TestCombine_ReincarnAsBase_IngredientIsReinc(t *testing.T) {
 	opts.ReincarnationRule = card.ReincarnationAsBase
 
 	// ingredient 是轮回牌
-	base := atk(card.SubDream, 3)
-	ingr := skl(card.SubReincarnation, 2)
+	base := atk(card.SuitHeart, 3)
+	ingr := skl(card.SuitSpade, 2)
 
 	result, err := card.Combine(base, ingr, opts)
 	if err != nil {
@@ -232,8 +232,8 @@ func TestCombine_ReincarnAsOther_UsesOtherPoints(t *testing.T) {
 	opts.ReincarnationRule = card.ReincarnationAsOther
 
 	// 轮回牌4 + 梦境牌3 → 结果 = 梦境牌 = 3
-	base := atk(card.SubReincarnation, 4)
-	ingr := skl(card.SubDream, 3)
+	base := atk(card.SuitSpade, 4)
+	ingr := skl(card.SuitHeart, 3)
 
 	result, err := card.Combine(base, ingr, opts)
 	if err != nil {
@@ -249,19 +249,19 @@ func TestCombine_ReincarnAsOther_UsesOtherPoints(t *testing.T) {
 // ════════════════════════════════════════════════════════════════
 
 func TestValidate_NilCard(t *testing.T) {
-	if err := card.Validate(nil, atk(card.SubDream, 1)); err == nil {
+	if err := card.Validate(nil, atk(card.SuitHeart, 1)); err == nil {
 		t.Error("expected error for nil base")
 	}
-	if err := card.Validate(atk(card.SubDream, 1), nil); err == nil {
+	if err := card.Validate(atk(card.SuitHeart, 1), nil); err == nil {
 		t.Error("expected error for nil ingredient")
 	}
 }
 
 func TestValidate_DifferentTypes_NoError(t *testing.T) {
 	pairs := [][2]*card.Card{
-		{atk(card.SubDream, 1), skl(card.SubDream, 1)},
-		{atk(card.SubDream, 1), eng(card.SubReform, 1)},
-		{skl(card.SubIllusion, 2), eng(card.SubReincarnation, 3)},
+		{atk(card.SuitHeart, 1), skl(card.SuitHeart, 1)},
+		{atk(card.SuitHeart, 1), eng(card.SuitClub, 1)},
+		{skl(card.SuitDiamond, 2), eng(card.SuitSpade, 3)},
 	}
 	for _, pair := range pairs {
 		if err := card.Validate(pair[0], pair[1]); err != nil {

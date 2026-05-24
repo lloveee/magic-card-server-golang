@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-// allSubFactions 和 allCardTypes 是抽牌时随机选取的候选集合。
+// allSuits 和 allCardTypes 是抽牌时随机选取的候选集合。
 // 使用切片而非直接用 Intn(4) 以便将来调整概率权重（比如让攻击牌更多见）。
-var allSubFactions = []SubFaction{
-	SubDream,
-	SubIllusion,
-	SubReform,
-	SubReincarnation,
+var allSuits = []Suit{
+	SuitHeart,
+	SuitDiamond,
+	SuitClub,
+	SuitSpade,
 }
 
 var allCardTypes = []CardType{
@@ -62,7 +62,7 @@ func (d *Deck) Seed() int64 {
 // Draw 从牌堆取一张随机牌。
 // 防御牌概率 1/6，其余三种类型均分 5/6。
 func (d *Deck) Draw() *Card {
-	sf := allSubFactions[d.rng.Intn(len(allSubFactions))]
+	s := allSuits[d.rng.Intn(len(allSuits))]
 	// 防御牌概率 1/6
 	var ct CardType
 	if d.rng.Intn(6) == 0 {
@@ -71,7 +71,7 @@ func (d *Deck) Draw() *Card {
 		ct = allCardTypes[d.rng.Intn(len(allCardTypes))]
 	}
 	pts := d.rng.Intn(MaxPoints) + MinPoints // [1, 5]
-	return New(sf, ct, pts)
+	return New(s, ct, pts)
 }
 
 // DrawN 连续抽取 n 张牌，顺序即为抽取顺序。

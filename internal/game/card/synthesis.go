@@ -94,7 +94,7 @@ func Validate(a, b *Card) error {
 // Combine 将两张牌合成为一张新牌。
 //
 // 结果牌的属性：
-//   - SubFaction、CardType 继承自 base（第一张牌）
+//   - Suit、CardType 继承自 base（第一张牌）
 //   - Points 由合成规则计算，受 opts 影响后截断到 PointsCap
 //   - IsHidden = false（合成产生的牌点数公开，隐藏状态来自场地效果，在抽牌时设置）
 //
@@ -127,7 +127,7 @@ func Combine(base, ingredient *Card, opts SynthesisOpts) (*Card, error) {
 	//   - PointsCap > 0：使用显式上限（场地效果可设置）
 	//   - PointsCap == 0：不截断，允许加法/乘法产生任意大值
 	// 虚幻之境·实特例：结果为虚幻牌时上限提升至 MaxPointsWithField（7）
-	if opts.IllusionBonus && base.SubFaction == SubIllusion {
+	if opts.IllusionBonus && base.Suit == SuitDiamond {
 		if points > MaxPointsWithField {
 			points = MaxPointsWithField
 		}
@@ -137,7 +137,7 @@ func Combine(base, ingredient *Card, opts SynthesisOpts) (*Card, error) {
 
 	return &Card{
 		ID:          newCardID(),
-		SubFaction:  base.SubFaction,
+		Suit:        base.Suit,
 		CardType:    base.CardType,
 		Points:      points,
 		Synthesized: true, // 产物标记为已合成，不可再次作为原料
@@ -157,10 +157,10 @@ func calcPoints(base, ingredient *Card, opts SynthesisOpts) int {
 	// ── 场地效果：轮回之境·实 ─────────────────────────────────
 	// 只要有一张是轮回牌，结果等于轮回牌自身的点数。
 	if opts.ReincarnationRule == ReincarnationAsBase {
-		if base.SubFaction == SubReincarnation {
+		if base.Suit == SuitSpade {
 			return basePts
 		}
-		if ingredient.SubFaction == SubReincarnation {
+		if ingredient.Suit == SuitSpade {
 			return ingrPts
 		}
 	}
@@ -168,16 +168,16 @@ func calcPoints(base, ingredient *Card, opts SynthesisOpts) int {
 	// ── 场地效果：轮回之境·虚 ─────────────────────────────────
 	// 只要有一张是轮回牌，结果等于非轮回牌的点数。
 	if opts.ReincarnationRule == ReincarnationAsOther {
-		if base.SubFaction == SubReincarnation {
+		if base.Suit == SuitSpade {
 			return ingrPts
 		}
-		if ingredient.SubFaction == SubReincarnation {
+		if ingredient.Suit == SuitSpade {
 			return basePts
 		}
 	}
 
 	// ── 标准合成规则 ───────────────────────────────────────────
-	if base.SubFaction.Major() == ingredient.SubFaction.Major() {
+	if base.Suit.Color() == ingredient.Suit.Color() {
 		// 同大系（梦幻+梦幻 or 重回+重回）→ 点数相乘
 		return basePts * ingrPts
 	}
