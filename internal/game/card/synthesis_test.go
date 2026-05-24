@@ -148,14 +148,14 @@ func TestCombine_AllowSameType_SameMajorMultiplies(t *testing.T) {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  场地效果：虚幻之境·实 IllusionBonus
+//  场地效果：方片之境·实 IllusionBonus
 // ════════════════════════════════════════════════════════════════
 
 func TestCombine_IllusionBonus_CapAt7ForIllusion(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.IllusionBonus = true
 
-	// base 是虚幻牌，同大系乘法：3×3=9 → 上限提升至7
+	// base 是方片牌，同色乘法：3×3=9 → 上限提升至7
 	base := atk(card.SuitDiamond, 3)
 	ingr := skl(card.SuitDiamond, 3)
 
@@ -172,7 +172,7 @@ func TestCombine_IllusionBonus_NoCapForNonIllusion(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.IllusionBonus = true
 
-	// base 是梦境牌（非虚幻），IllusionBonus 不生效，无上限：3×3=9
+	// base 是红桃牌（非方片），IllusionBonus 不生效，无上限：3×3=9
 	base := atk(card.SuitHeart, 3)
 	ingr := skl(card.SuitHeart, 3)
 
@@ -186,14 +186,14 @@ func TestCombine_IllusionBonus_NoCapForNonIllusion(t *testing.T) {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  场地效果：轮回之境·实 ReincarnationAsBase
+//  场地效果：黑桃之境·实 ReincarnationAsBase
 // ════════════════════════════════════════════════════════════════
 
 func TestCombine_ReincarnAsBase_UsesReincarnPoints(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.ReincarnationRule = card.ReincarnationAsBase
 
-	// 轮回牌点数4，另一张点数2 → 结果 = 轮回牌自身 = 4
+	// 黑桃牌点数4，另一张点数2 → 结果 = 黑桃牌自身 = 4
 	base := atk(card.SuitSpade, 4)
 	ingr := skl(card.SuitHeart, 2)
 
@@ -210,7 +210,7 @@ func TestCombine_ReincarnAsBase_IngredientIsReinc(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.ReincarnationRule = card.ReincarnationAsBase
 
-	// ingredient 是轮回牌
+	// ingredient 是黑桃牌
 	base := atk(card.SuitHeart, 3)
 	ingr := skl(card.SuitSpade, 2)
 
@@ -218,20 +218,20 @@ func TestCombine_ReincarnAsBase_IngredientIsReinc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Points != 2 { // 轮回牌自身点数2
+	if result.Points != 2 { // 黑桃牌自身点数2
 		t.Errorf("ReincarnAsBase (ingr): points = %d, want 2", result.Points)
 	}
 }
 
 // ════════════════════════════════════════════════════════════════
-//  场地效果：轮回之境·虚 ReincarnationAsOther
+//  场地效果：黑桃之境·虚 ReincarnationAsOther
 // ════════════════════════════════════════════════════════════════
 
 func TestCombine_ReincarnAsOther_UsesOtherPoints(t *testing.T) {
 	opts := card.DefaultOpts()
 	opts.ReincarnationRule = card.ReincarnationAsOther
 
-	// 轮回牌4 + 梦境牌3 → 结果 = 梦境牌 = 3
+	// 黑桃牌4 + 红桃牌3 → 结果 = 红桃牌 = 3
 	base := atk(card.SuitSpade, 4)
 	ingr := skl(card.SuitHeart, 3)
 

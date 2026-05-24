@@ -278,7 +278,7 @@ func (e *Engine) runDraw() {
 	e.broadcastPhaseChange()
 	e.doDraw()
 
-	// 虚幻之境·虚：本回合补入的牌对对手隐藏
+	// 方片之境·虚：本回合补入的牌对对手隐藏
 	if e.state.FieldEffect != nil && e.state.FieldEffect.HideDrawnCards {
 		for _, p := range e.state.Players {
 			for _, sc := range p.Hand.HandSlottedCards() {

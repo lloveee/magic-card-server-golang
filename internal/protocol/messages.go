@@ -213,8 +213,8 @@ type LiberationEv struct {
 
 // FieldEffectEv S→C 场地效果生效事件（每阶段开始时）。
 type FieldEffectEv struct {
-	EffectID   string `json:"effect_id"`   // 内部标识，如 "illusory_real"
-	EffectName string `json:"effect_name"` // 展示名，如 "虚幻之境·实"
+	EffectID   string `json:"effect_id"`   // 内部标识，如 "diamond_real"
+	EffectName string `json:"effect_name"` // 展示名，如 "方片之境·实"
 	Desc       string `json:"desc"`
 }
 

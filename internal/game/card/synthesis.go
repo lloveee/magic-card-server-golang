@@ -9,14 +9,14 @@ import (
 //  合成选项（受场地效果影响）
 // ════════════════════════════════════════════════════════════════
 
-// ReincarnationRule 枚举轮回牌参与合成时的特殊计算规则。
-// 由场地效果"轮回之境·实/虚"激活。
+// ReincarnationRule 枚举黑桃牌参与合成时的特殊计算规则。
+// 由场地效果"黑桃之境·实/虚"激活。
 type ReincarnationRule int8
 
 const (
 	ReincarnationNormal  ReincarnationRule = iota // 标准规则（无场地效果）
-	ReincarnationAsBase                           // 轮回之境·实：结果 = 轮回牌自身点数
-	ReincarnationAsOther                          // 轮回之境·虚：结果 = 非轮回牌的点数
+	ReincarnationAsBase                           // 黑桃之境·实：结果 = 黑桃牌自身点数
+	ReincarnationAsOther                          // 黑桃之境·虚：结果 = 非黑桃牌的点数
 )
 
 // SynthesisOpts 是合成操作的配置，由当前生效的场地效果决定。
@@ -27,14 +27,14 @@ const (
 //	相同输入 + 相同 opts = 相同输出，便于测试和调试。
 type SynthesisOpts struct {
 	// PointsCap 是合成结果的点数上限。
-	// 默认 5，IllusionBonus 激活且结果为虚幻牌时可提升至 7。
+	// 默认 5，IllusionBonus 激活且结果为方片牌时可提升至 7。
 	PointsCap int
 
-	// ReincarnationRule 控制轮回牌参与合成时的计算方式。
+	// ReincarnationRule 控制黑桃牌参与合成时的计算方式。
 	ReincarnationRule ReincarnationRule
 
-	// IllusionBonus：虚幻之境·实 场地效果——结果牌为虚幻子系时，点数上限提升至 7。
-	// 若结果不是虚幻牌，仍使用 PointsCap（默认 5）。
+	// IllusionBonus：方片之境·实 场地效果——结果牌为方片花色时，点数上限提升至 7。
+	// 若结果不是方片牌，仍使用 PointsCap（默认 5）。
 	IllusionBonus bool
 
 	// AllowSameType：混沌之域 场地效果——允许同功能牌型（如攻击+攻击）合成。
@@ -126,7 +126,7 @@ func Combine(base, ingredient *Card, opts SynthesisOpts) (*Card, error) {
 	// 点数上限：
 	//   - PointsCap > 0：使用显式上限（场地效果可设置）
 	//   - PointsCap == 0：不截断，允许加法/乘法产生任意大值
-	// 虚幻之境·实特例：结果为虚幻牌时上限提升至 MaxPointsWithField（7）
+	// 方片之境·实特例：结果为方片牌时上限提升至 MaxPointsWithField（7）
 	if opts.IllusionBonus && base.Suit == SuitDiamond {
 		if points > MaxPointsWithField {
 			points = MaxPointsWithField
@@ -154,8 +154,8 @@ func calcPoints(base, ingredient *Card, opts SynthesisOpts) int {
 		ingrPts = opts.PointsModifier(ingrPts, ingredient)
 	}
 
-	// ── 场地效果：轮回之境·实 ─────────────────────────────────
-	// 只要有一张是轮回牌，结果等于轮回牌自身的点数。
+	// ── 场地效果：黑桃之境·实 ─────────────────────────────────
+	// 只要有一张是黑桃牌，结果等于黑桃牌自身的点数。
 	if opts.ReincarnationRule == ReincarnationAsBase {
 		if base.Suit == SuitSpade {
 			return basePts
@@ -165,8 +165,8 @@ func calcPoints(base, ingredient *Card, opts SynthesisOpts) int {
 		}
 	}
 
-	// ── 场地效果：轮回之境·虚 ─────────────────────────────────
-	// 只要有一张是轮回牌，结果等于非轮回牌的点数。
+	// ── 场地效果：黑桃之境·虚 ─────────────────────────────────
+	// 只要有一张是黑桃牌，结果等于非黑桃牌的点数。
 	if opts.ReincarnationRule == ReincarnationAsOther {
 		if base.Suit == SuitSpade {
 			return ingrPts
@@ -178,9 +178,9 @@ func calcPoints(base, ingredient *Card, opts SynthesisOpts) int {
 
 	// ── 标准合成规则 ───────────────────────────────────────────
 	if base.Suit.Color() == ingredient.Suit.Color() {
-		// 同大系（梦幻+梦幻 or 重回+重回）→ 点数相乘
+		// 同色（红色+红色 or 黑色+黑色）→ 点数相乘
 		return basePts * ingrPts
 	}
-	// 不同大系（梦幻+重回）→ 点数相加
+	// 不同色（红色+黑色）→ 点数相加
 	return basePts + ingrPts
 }
