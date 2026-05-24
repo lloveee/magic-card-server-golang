@@ -170,7 +170,7 @@ type DefenseReq struct {
 type CardPlayedEv struct {
 	PlayerSeat int    `json:"player_seat"`
 	CardType   string `json:"card_type"`
-	Faction    string `json:"faction"`
+	Suit       string `json:"suit"` // 花色符号："♥" / "♦" / "♣" / "♠"
 	Points     *int   `json:"points"`
 }
 

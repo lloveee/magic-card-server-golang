@@ -507,7 +507,7 @@ func (e *Engine) handlePlayCard(seat int, payload []byte) {
 	e.room.Broadcast(protocol.MsgCardPlayedEv, protocol.MustEncode(protocol.CardPlayedEv{
 		PlayerSeat: seat,
 		CardType:   c.CardType.String(),
-		Faction:    c.Suit.String(),
+		Suit:       c.Suit.Symbol(),
 		Points:     &c.Points,
 	}))
 
@@ -730,7 +730,7 @@ func (e *Engine) handleDefenseAction(seat int, payload []byte) {
 	e.room.Broadcast(protocol.MsgCardPlayedEv, protocol.MustEncode(protocol.CardPlayedEv{
 		PlayerSeat: seat,
 		CardType:   defCard.CardType.String(),
-		Faction:    defCard.Suit.String(),
+		Suit:       defCard.Suit.Symbol(),
 		Points:     &defCard.Points,
 	}))
 

@@ -76,7 +76,7 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 		pts := applyModifiedPoints(sc.Card.Points, sc.Card, p)
 		cv := protocol.CardView{
 			Slot:     sc.Slot,
-			Faction:  sc.Card.Suit.String(),
+			Suit:     sc.Card.Suit.Symbol(),
 			CardType: sc.Card.CardType.String(),
 			Points:   protocol.IntPtr(pts),
 		}
@@ -91,7 +91,7 @@ func buildSelfView(p *PlayerState) protocol.PlayerView {
 		pts := applyModifiedPoints(sc.Card.Points, sc.Card, p)
 		cv := protocol.CardView{
 			Slot:     sc.Slot,
-			Faction:  sc.Card.Suit.String(),
+			Suit:     sc.Card.Suit.Symbol(),
 			CardType: sc.Card.CardType.String(),
 			Points:   protocol.IntPtr(pts),
 		}
