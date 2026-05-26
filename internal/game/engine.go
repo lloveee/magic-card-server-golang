@@ -56,21 +56,31 @@ type Engine struct {
 
 	// onDone 在引擎 goroutine 退出前调用，用于通知外部清理房间/引擎注册表。
 	onDone func()
+
+	// reviveTimeoutSec 蘇芳复活对话框的总时长（秒）。默认 15。
+	// 测试可覆盖为更小的值以加速时序断言。
+	reviveTimeoutSec int
 }
+
+// msgReviveTimeoutSentinel 是 enterAwaitingRevive 启动的超时 goroutine
+// 在到期时向 actionCh 投递的伪 MsgID，processAction 收到后调用 finalizeRealDeath。
+// 选用 0xFFFF（uint16 最大值）以避免与任何真实协议 ID 冲突。
+const msgReviveTimeoutSentinel uint16 = 0xFFFF
 
 // NewEngine 创建游戏引擎，绑定到指定房间。
 // 若 Room.AISeat >= 0，引擎将自动为 AI 座位完成选角并在行动阶段代为决策。
 func NewEngine(r *room.Room) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Engine{
-		state:    newGameState(r.ID),
-		room:     r,
-		actionCh: make(chan action, 32),
-		ctx:      ctx,
-		cancel:   cancel,
-		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		aiSeat:   r.AISeat,
-		aiCharID: r.AICharID,
+		state:            newGameState(r.ID),
+		room:             r,
+		actionCh:         make(chan action, 32),
+		ctx:              ctx,
+		cancel:           cancel,
+		rng:              rand.New(rand.NewSource(time.Now().UnixNano())),
+		aiSeat:           r.AISeat,
+		aiCharID:         r.AICharID,
+		reviveTimeoutSec: 15, // 蘇芳复活对话框默认 15s（测试可覆盖）
 	}
 }
 
@@ -425,9 +435,16 @@ func (e *Engine) processAction(act action) {
 	}
 
 	// 蘇芳复活对话框：开启期间冻结所有玩家的常规行动，
-	// 仅放行 MsgReviveReq（必须由复活方发出）。
+	// 仅放行 MsgReviveReq（必须由复活方发出）与超时哨兵。
 	// MsgSurrenderReq 已在上面早返回，因此此处无需再列出。
 	if e.state.AwaitingRevive != -1 {
+		// 超时哨兵：仅当 act.Seat 与 AwaitingRevive 相同时生效（避免对其他状态误触发）
+		if act.MsgID == msgReviveTimeoutSentinel {
+			if act.Seat == e.state.AwaitingRevive {
+				e.finalizeRealDeath(act.Seat, "suou_revive_timeout")
+			}
+			return
+		}
 		if act.MsgID == protocol.MsgReviveReq {
 			// 仅复活方本人可发；非本人发的复活请求当作普通无效消息忽略
 			if act.Seat != e.state.AwaitingRevive {
@@ -438,6 +455,10 @@ func (e *Engine) processAction(act action) {
 			return
 		}
 		e.sendError(act.Seat, protocol.ErrCodeInvalidPhase, "对方正在复活中，请等待")
+		return
+	}
+	// 超时哨兵在非 AwaitingRevive 时直接忽略（防止迟到的 sentinel 触发）
+	if act.MsgID == msgReviveTimeoutSentinel {
 		return
 	}
 
@@ -963,6 +984,20 @@ func (e *Engine) applyDamage(targetSeat, amount int, detail string) {
 func (e *Engine) handleHPZero(seat int) {
 	p := e.state.Players[seat]
 
+	// 蘇芳特例：没有濒死状态，HP 归零直接进入 15s 复活对话框。
+	// 调用 OnLethalCheck 获取角色"允许进入复活流程"的确认；返回 survive=true
+	// 即不走默认 triggerDeath，转入 enterAwaitingRevive。
+	if p.CharacterID == "suou" && e.state.AwaitingRevive == -1 {
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.OnLethalCheck != nil {
+			oppHP := e.state.Players[1-seat].HP
+			survive, _, _ := p.Char.Def.Hooks.OnLethalCheck(0, p.Char.ExtraState, oppHP)
+			if survive {
+				e.enterAwaitingRevive(seat)
+				return
+			}
+		}
+	}
+
 	if !p.IsNearDeath {
 		// 首次归零：进入濒死状态，回血到60
 		p.HP = 60
@@ -1038,6 +1073,62 @@ func (e *Engine) handleRevive(seat int, payload []byte) {
 	_ = payload
 	// Phase 4.8 将替换为完整校验 + 复活 / 拒绝逻辑。
 	e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "复活功能尚未实装")
+}
+
+// enterAwaitingRevive 蘇芳 HP 归零后开启 15s 复活对话框。
+//   - 设置 state.AwaitingRevive=seat、ReviveDeadline
+//   - 广播 MsgDeathDialogEv
+//   - 启动一个超时 goroutine，在到期时向 actionCh 投递 msgReviveTimeoutSentinel；
+//     handleRevive 成功复活时不会取消该 goroutine（也无需取消，因为 sentinel 到达
+//     时 AwaitingRevive 已被重置为 -1，processAction 会忽略它）。
+func (e *Engine) enterAwaitingRevive(seat int) {
+	timeoutSec := e.reviveTimeoutSec
+	if timeoutSec <= 0 {
+		timeoutSec = 15
+	}
+	deadline := time.Now().Add(time.Duration(timeoutSec) * time.Second)
+	e.state.AwaitingRevive = seat
+	e.state.ReviveDeadline = deadline
+
+	slog.Info("suou: entering revive dialog", "seat", seat, "timeout_sec", timeoutSec)
+	e.room.Broadcast(protocol.MsgDeathDialogEv, protocol.MustEncode(protocol.DeathDialogEv{
+		Seat:        seat,
+		DeadlineMS:  deadline.UnixMilli(),
+		DurationSec: timeoutSec,
+	}))
+
+	// 启动超时 goroutine：到期后投递哨兵动作。
+	// 使用 SubmitAction 保证：若引擎已停止（ctx 已取消），select 走 <-e.ctx.Done() 分支，
+	// 哨兵被丢弃，无 goroutine 泄漏。
+	go func(s int, dur time.Duration) {
+		t := time.NewTimer(dur)
+		defer t.Stop()
+		select {
+		case <-t.C:
+			e.SubmitAction(s, msgReviveTimeoutSentinel, nil)
+		case <-e.ctx.Done():
+			return
+		}
+	}(seat, time.Duration(timeoutSec)*time.Second)
+}
+
+// finalizeRealDeath 蘇芳复活流程失败（超时或玩家放弃）→ 真正死亡，对手获胜。
+// reason 写入 GameOverEv.Reason（如 "suou_revive_timeout"）。
+func (e *Engine) finalizeRealDeath(loseSeat int, reason string) {
+	if e.state.isOver() {
+		return
+	}
+	winner := 1 - loseSeat
+	e.state.Phase = PhaseGameOver
+	e.state.Winner = winner
+	e.state.AwaitingRevive = -1
+
+	slog.Info("suou: revive failed, real death", "loser_seat", loseSeat, "reason", reason)
+	e.room.Broadcast(protocol.MsgGameOverEv, protocol.MustEncode(protocol.GameOverEv{
+		WinnerSeat: winner,
+		Reason:     reason,
+	}))
+	e.Stop()
 }
 
 // handleSurrender 处理 MsgSurrenderReq：投降方判负，对手立即获胜。
