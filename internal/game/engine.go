@@ -424,6 +424,23 @@ func (e *Engine) processAction(act action) {
 		return
 	}
 
+	// 蘇芳复活对话框：开启期间冻结所有玩家的常规行动，
+	// 仅放行 MsgReviveReq（必须由复活方发出）。
+	// MsgSurrenderReq 已在上面早返回，因此此处无需再列出。
+	if e.state.AwaitingRevive != -1 {
+		if act.MsgID == protocol.MsgReviveReq {
+			// 仅复活方本人可发；非本人发的复活请求当作普通无效消息忽略
+			if act.Seat != e.state.AwaitingRevive {
+				e.sendError(act.Seat, protocol.ErrCodeInvalidPhase, "对方正在复活中，请等待")
+				return
+			}
+			e.handleRevive(act.Seat, act.Payload)
+			return
+		}
+		e.sendError(act.Seat, protocol.ErrCodeInvalidPhase, "对方正在复活中，请等待")
+		return
+	}
+
 	// 防御窗口期间：即使防御方已宣告结束行动，仍必须响应来袭攻击
 	if e.state.PendingAttack != nil {
 		defSeat := 1 - e.state.PendingAttack.AttackerSeat
@@ -1012,6 +1029,15 @@ func (e *Engine) triggerDeath(loseSeat int) {
 		WinnerSeat: winner,
 		Reason:     "hp_zero",
 	}))
+}
+
+// handleRevive 蘇芳复活流程（Phase 4.8 实装）。
+// Phase 4.4 阶段先放占位，仅返回错误确保 action-dispatcher 路由编译通过。
+func (e *Engine) handleRevive(seat int, payload []byte) {
+	_ = seat
+	_ = payload
+	// Phase 4.8 将替换为完整校验 + 复活 / 拒绝逻辑。
+	e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "复活功能尚未实装")
 }
 
 // handleSurrender 处理 MsgSurrenderReq：投降方判负，对手立即获胜。

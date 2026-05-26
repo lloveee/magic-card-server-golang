@@ -1,6 +1,8 @@
 package game
 
 import (
+	"time"
+
 	"echo/internal/game/card"
 	"echo/internal/game/character"
 	"echo/internal/game/field"
@@ -148,16 +150,26 @@ type GameState struct {
 
 	// Winner：-1 = 游戏未结束，0 or 1 = 获胜方座位
 	Winner int
+
+	// AwaitingRevive：蘇芳 HP 归零后的 15s 复活对话框正在进行中，
+	// 值为对话框开启的玩家座位（0 or 1）；-1 表示无人在复活。
+	// 该状态期间，对手的所有行动消息均被 action-dispatcher 阻拦，
+	// 仅放行 MsgReviveReq（来自复活方）与 MsgSurrenderReq（来自任一方）。
+	AwaitingRevive int
+
+	// ReviveDeadline 复活对话框的超时时刻（仅 AwaitingRevive != -1 时有效）。
+	ReviveDeadline time.Time
 }
 
 // newGameState 创建初始游戏状态。
 func newGameState(gameID string) *GameState {
 	return &GameState{
-		GameID:  gameID,
-		Round:   0,
-		Phase:   PhaseWaiting,
-		Players: [2]*PlayerState{newPlayerState(0), newPlayerState(1)},
-		Winner:  -1,
+		GameID:         gameID,
+		Round:          0,
+		Phase:          PhaseWaiting,
+		Players:        [2]*PlayerState{newPlayerState(0), newPlayerState(1)},
+		Winner:         -1,
+		AwaitingRevive: -1,
 	}
 }
 
