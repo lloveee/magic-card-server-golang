@@ -91,12 +91,27 @@ func newPlayerState(seat int) *PlayerState {
 // 不再受角色 MaxHandSize 钩子影响——MaxHandSize 仅用于"技能内抽牌"的回合内上限
 // 校验（见 engine.applySkillResult 中 DrawCards 的处理）。这与设计相符：
 // 每回合开始双方均按固定 8 张补牌，律花的"能量=手牌上限"只在出技能牌时生效。
+//
+// 角色钩子 FillTargetSize 可覆盖默认目标张数（蘇芳=4）。
+// 完成基础补牌后调用 BonusFillDraw（蘇芳：上回合跳过清场则额外补 +4）。
 func (p *PlayerState) drawCards() {
 	maxSlots := card.HandZoneSize
 	if p.IsNearDeath {
 		maxSlots = card.SafeZoneSize // 濒死只能补安全区
 	}
+	// 钩子：FillTargetSize（覆盖补牌目标，蘇芳=4）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.FillTargetSize != nil {
+		if n := p.Char.Def.Hooks.FillTargetSize(p.Char.ExtraState); n > 0 {
+			maxSlots = n
+		}
+	}
 	p.Hand.Fill(p.Deck, maxSlots)
+	// 钩子：BonusFillDraw（基础补牌完成后额外抽牌，蘇芳：上回合跳过清场后 +4）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.BonusFillDraw != nil {
+		if extra := p.Char.Def.Hooks.BonusFillDraw(p.Char.ExtraState); extra > 0 {
+			p.Hand.DrawIntoHand(p.Deck, extra)
+		}
+	}
 }
 
 // ════════════════════════════════════════════════════════════════

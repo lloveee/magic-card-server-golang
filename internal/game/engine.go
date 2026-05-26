@@ -1059,7 +1059,14 @@ func (e *Engine) runCleanup() bool {
 		}
 
 		// 清除弃牌区（手牌区槽位 5-8）
-		p.Hand.ClearDiscardZone()
+		// 角色钩子 SkipCleanup 可整体跳过本玩家的弃牌区清理（蘇芳：本回合未出过攻击牌时）。
+		skip := false
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.SkipCleanup != nil {
+			skip = p.Char.Def.Hooks.SkipCleanup(p.Char.ExtraState)
+		}
+		if !skip {
+			p.Hand.ClearDiscardZone()
+		}
 
 		// 赐福判定：HP < 40 且尚未触发
 		if p.HP < 40 && !p.BlessingUsed {
