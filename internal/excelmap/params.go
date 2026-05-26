@@ -77,6 +77,20 @@ var HooksParamMap = map[string]ParamDef{
 	"解放后续命中恢复": {JSONKey: "lib_subsequent_heal", DataType: "int"},
 	// 节律者
 	"技能能量消耗": {JSONKey: "skill_energy_cost", DataType: "int"},
+	// 六華（rokka）
+	"手牌上限":     {JSONKey: "hand_size_cap", DataType: "int"},
+	"触发结算眼数":   {JSONKey: "lit_eyes_needed", DataType: "int"},
+	"等边·回血":    {JSONKey: "triangle_heal", DataType: "int"},
+	"等边·摸牌":    {JSONKey: "triangle_draw", DataType: "int"},
+	"邻接·摸牌":    {JSONKey: "adjacent_draw", DataType: "int"},
+	"其他·伤害":    {JSONKey: "other_damage", DataType: "int"},
+	"其他·摸牌":    {JSONKey: "other_draw", DataType: "int"},
+	// 蘇芳（suou）
+	"基础补牌张数":   {JSONKey: "fill_base", DataType: "int"},
+	"跳过清场后补牌": {JSONKey: "skip_cleanup_bonus", DataType: "int"},
+	"复活倒计时秒数": {JSONKey: "revive_timeout_sec", DataType: "int"},
+	"复活·未合成摸牌": {JSONKey: "revive_unsynth_draw", DataType: "int"},
+	"复活·已合成摸牌": {JSONKey: "revive_synth_draw", DataType: "int"},
 }
 
 // HooksParamOverrides 当同一个中文名在不同角色映射到不同 JSON key 时使用。
@@ -154,6 +168,20 @@ var HooksParamNotes = map[string]string{
 	"解放后续命中恢复": "四印解放后每回合非首次命中时附加的恢复量",
 	// 节律者
 	"技能能量消耗": "节律者每次使用技能牌固定消耗的能量",
+	// 六華（rokka）
+	"手牌上限":     "六華技能抽牌时的手牌上限（始终生效；仅限技能抽牌路径）",
+	"触发结算眼数":   "六眼大阵点亮多少眼后触发几何结算（默认 3）",
+	"等边·回血":    "三眼形成等边三角形 {0,2,4}/{1,3,5} 时回复的生命值",
+	"等边·摸牌":    "三眼形成等边三角形时额外摸的牌数",
+	"邻接·摸牌":    "三眼连续相邻（含跨界）时摸的牌数",
+	"其他·伤害":    "三眼非等边非邻接时对敌方造成的伤害",
+	"其他·摸牌":    "三眼非等边非邻接时额外摸的牌数",
+	// 蘇芳（suou）
+	"基础补牌张数":   "蘇芳每阶段补牌目标张数（覆盖默认 8）",
+	"跳过清场后补牌": "蘇芳本阶段未出攻击牌时，下阶段额外追加抽取的牌数",
+	"复活倒计时秒数": "0HP 后复活对话框的总时长，超时则真死亡",
+	"复活·未合成摸牌": "拖入两张未合成同色同点牌时复活后摸的牌数",
+	"复活·已合成摸牌": "拖入两张已合成同色牌时复活后摸的牌数",
 }
 
 // CharOrder 是 Excel 各 sheet 默认的角色排列顺序（与 gen_template.go 保持一致）。
@@ -161,7 +189,7 @@ var HooksParamNotes = map[string]string{
 var CharOrder = []string{
 	"焰", "镜花", "空音", "深宵", "茜", "圣罗",
 	"时雨", "梦月", "红叶", "真守", "樱花", "琉璃",
-	"宵", "琉奈", "律花", "结城",
+	"宵", "琉奈", "律花", "结城", "六華", "蘇芳",
 }
 
 // HooksParamOrder 是反向生成"特殊机制"sheet 时，每个角色内部参数行的稳定排序权重。
@@ -190,6 +218,14 @@ var HooksParamOrder = []string{
 	"解放首次命中伤害", "解放后续命中恢复",
 	// 节律者
 	"技能能量消耗",
+	// 六華（rokka）
+	"手牌上限", "触发结算眼数",
+	"等边·回血", "等边·摸牌",
+	"邻接·摸牌",
+	"其他·伤害", "其他·摸牌",
+	// 蘇芳（suou）
+	"基础补牌张数", "跳过清场后补牌",
+	"复活倒计时秒数", "复活·未合成摸牌", "复活·已合成摸牌",
 }
 
 // ParamOrderIndex 把 HooksParamOrder 转成 中文名 → 序号 的查表，便于排序时 O(1) 查询。
