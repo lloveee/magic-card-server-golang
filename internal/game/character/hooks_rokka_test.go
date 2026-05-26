@@ -40,3 +40,40 @@ func TestRokkaActivation(t *testing.T) {
 		}
 	}
 }
+
+// TestRokkaLightOneEye 验证：大阵锁定后，打出与某眼点数匹配的技能牌点亮该眼，
+// 不产生技能效果（达到3眼前不结算）。
+func TestRokkaLightOneEye(t *testing.T) {
+	def := MustGet("rokka")
+	es := map[string]any{
+		"rokka_eyes_points":    [6]int{3, 5, 2, 4, 2, 1},
+		"rokka_activation_idx": 6,
+	}
+	result, cost, handled := def.Hooks.UseSkillOverride(5, es)
+	if !handled || cost != 0 {
+		t.Fatalf("handled=%v cost=%d", handled, cost)
+	}
+	if result.DealDirectDamage != 0 || result.HealSelf != 0 || result.DrawCards != 0 {
+		t.Fatalf("result should be zero, got %+v", result)
+	}
+	lit, _ := es["rokka_lit_eyes"].([]int)
+	if len(lit) != 1 || lit[0] != 1 {
+		t.Fatalf("lit_eyes=%v, want [1]", lit)
+	}
+}
+
+// TestRokkaRejectNoMatch 验证：锁定后无匹配眼时 PreUseSkillCheck 拒绝。
+func TestRokkaRejectNoMatch(t *testing.T) {
+	def := MustGet("rokka")
+	if def.Hooks.PreUseSkillCheck == nil {
+		t.Fatal("rokka must have PreUseSkillCheck")
+	}
+	es := map[string]any{
+		"rokka_eyes_points":    [6]int{3, 5, 2, 4, 2, 1},
+		"rokka_activation_idx": 6,
+	}
+	err := def.Hooks.PreUseSkillCheck(99, es)
+	if err == nil {
+		t.Fatal("expected error for no-match skill play")
+	}
+}
