@@ -41,6 +41,7 @@ func (h *Handler) RegisterAll(r *network.Router) {
 		protocol.MsgTriggerLibrateReq,
 		protocol.MsgEndActionReq,
 		protocol.MsgDefenseReq,
+		protocol.MsgSurrenderReq,
 	}
 	for _, msgID := range inGameMsgs {
 		id := msgID // 闭包捕获副本，避免循环变量问题（Go 1.22 已修复，显式保留更清晰）

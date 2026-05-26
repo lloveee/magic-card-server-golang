@@ -56,21 +56,31 @@ type Engine struct {
 
 	// onDone 在引擎 goroutine 退出前调用，用于通知外部清理房间/引擎注册表。
 	onDone func()
+
+	// reviveTimeoutSec 蘇芳复活对话框的总时长（秒）。默认 15。
+	// 测试可覆盖为更小的值以加速时序断言。
+	reviveTimeoutSec int
 }
+
+// msgReviveTimeoutSentinel 是 enterAwaitingRevive 启动的超时 goroutine
+// 在到期时向 actionCh 投递的伪 MsgID，processAction 收到后调用 finalizeRealDeath。
+// 选用 0xFFFF（uint16 最大值）以避免与任何真实协议 ID 冲突。
+const msgReviveTimeoutSentinel uint16 = 0xFFFF
 
 // NewEngine 创建游戏引擎，绑定到指定房间。
 // 若 Room.AISeat >= 0，引擎将自动为 AI 座位完成选角并在行动阶段代为决策。
 func NewEngine(r *room.Room) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Engine{
-		state:    newGameState(r.ID),
-		room:     r,
-		actionCh: make(chan action, 32),
-		ctx:      ctx,
-		cancel:   cancel,
-		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		aiSeat:   r.AISeat,
-		aiCharID: r.AICharID,
+		state:            newGameState(r.ID),
+		room:             r,
+		actionCh:         make(chan action, 32),
+		ctx:              ctx,
+		cancel:           cancel,
+		rng:              rand.New(rand.NewSource(time.Now().UnixNano())),
+		aiSeat:           r.AISeat,
+		aiCharID:         r.AICharID,
+		reviveTimeoutSec: 15, // 蘇芳复活对话框默认 15s（测试可覆盖）
 	}
 }
 
@@ -417,6 +427,41 @@ func (e *Engine) broadcastTurnTimer(activeSeat, secondsLeft int) {
 
 // processAction 处理一条玩家行动消息，所有操作在此串行执行。
 func (e *Engine) processAction(act action) {
+	// 投降：任何时机均可触发（含对手回合、防御窗口期间），
+	// 绕过下面的"是否轮到你"/"是否已结束行动"/"是否需先防御"等校验。
+	if act.MsgID == protocol.MsgSurrenderReq {
+		e.handleSurrender(act.Seat)
+		return
+	}
+
+	// 蘇芳复活对话框：开启期间冻结所有玩家的常规行动，
+	// 仅放行 MsgReviveReq（必须由复活方发出）与超时哨兵。
+	// MsgSurrenderReq 已在上面早返回，因此此处无需再列出。
+	if e.state.AwaitingRevive != -1 {
+		// 超时哨兵：仅当 act.Seat 与 AwaitingRevive 相同时生效（避免对其他状态误触发）
+		if act.MsgID == msgReviveTimeoutSentinel {
+			if act.Seat == e.state.AwaitingRevive {
+				e.finalizeRealDeath(act.Seat, "suou_revive_timeout")
+			}
+			return
+		}
+		if act.MsgID == protocol.MsgReviveReq {
+			// 仅复活方本人可发；非本人发的复活请求当作普通无效消息忽略
+			if act.Seat != e.state.AwaitingRevive {
+				e.sendError(act.Seat, protocol.ErrCodeInvalidPhase, "对方正在复活中，请等待")
+				return
+			}
+			e.handleRevive(act.Seat, act.Payload)
+			return
+		}
+		e.sendError(act.Seat, protocol.ErrCodeInvalidPhase, "对方正在复活中，请等待")
+		return
+	}
+	// 超时哨兵在非 AwaitingRevive 时直接忽略（防止迟到的 sentinel 触发）
+	if act.MsgID == msgReviveTimeoutSentinel {
+		return
+	}
+
 	// 防御窗口期间：即使防御方已宣告结束行动，仍必须响应来袭攻击
 	if e.state.PendingAttack != nil {
 		defSeat := 1 - e.state.PendingAttack.AttackerSeat
@@ -939,6 +984,20 @@ func (e *Engine) applyDamage(targetSeat, amount int, detail string) {
 func (e *Engine) handleHPZero(seat int) {
 	p := e.state.Players[seat]
 
+	// 蘇芳特例：没有濒死状态，HP 归零直接进入 15s 复活对话框。
+	// 调用 OnLethalCheck 获取角色"允许进入复活流程"的确认；返回 survive=true
+	// 即不走默认 triggerDeath，转入 enterAwaitingRevive。
+	if p.CharacterID == "suou" && e.state.AwaitingRevive == -1 {
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.OnLethalCheck != nil {
+			oppHP := e.state.Players[1-seat].HP
+			survive, _, _ := p.Char.Def.Hooks.OnLethalCheck(0, p.Char.ExtraState, oppHP)
+			if survive {
+				e.enterAwaitingRevive(seat)
+				return
+			}
+		}
+	}
+
 	if !p.IsNearDeath {
 		// 首次归零：进入濒死状态，回血到60
 		p.HP = 60
@@ -1007,6 +1066,203 @@ func (e *Engine) triggerDeath(loseSeat int) {
 	}))
 }
 
+// handleRevive 蘇芳复活流程：玩家拖入两张手牌请求复活。
+//
+// 合法组合：
+//   - 两张未合成、同大色、同点数 → 1HP 复活、抽 revive_unsynth_draw 张 (默认 4)
+//   - 两张已合成、同大色             → 1HP 复活、抽 revive_synth_draw 张 (默认 8)
+//
+// 校验失败：返回 ErrCodeInvalidReviveCards，AwaitingRevive 保持开启，
+// 玩家可重试（超时 goroutine 仍在运行）。
+// 成功：消耗两张牌、HP=1、抽对应张数、关闭 AwaitingRevive、广播状态。
+func (e *Engine) handleRevive(seat int, payload []byte) {
+	req, err := protocol.Decode[protocol.ReviveReq](payload)
+	if err != nil {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "无效请求格式")
+		return
+	}
+
+	p := e.state.Players[seat]
+	c1 := e.resolveCardRef(p, req.Card1)
+	c2 := e.resolveCardRef(p, req.Card2)
+	if c1 == nil || c2 == nil {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "指定槽位为空")
+		return
+	}
+	// 两张引用必须指向不同的牌实例
+	if c1 == c2 {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "不能选择同一张牌两次")
+		return
+	}
+
+	// 必须同大色
+	if c1.Suit.Color() != c2.Suit.Color() {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "两张牌大色不同")
+		return
+	}
+
+	cfg := character.HooksConfig("suou")
+	unsynthDraw := hcIntDefault(cfg, "revive_unsynth_draw", 4)
+	synthDraw := hcIntDefault(cfg, "revive_synth_draw", 8)
+
+	var drawN int
+	switch {
+	case !c1.Synthesized && !c2.Synthesized:
+		// 两张未合成 + 同色 → 必须同点数
+		if c1.Points != c2.Points {
+			e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "两张未合成牌点数不同")
+			return
+		}
+		drawN = unsynthDraw
+	case c1.Synthesized && c2.Synthesized:
+		drawN = synthDraw
+	default:
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "两张牌合成状态不一致")
+		return
+	}
+
+	// 校验通过 → 消耗两张牌
+	e.consumeCardRef(p, req.Card1)
+	e.consumeCardRef(p, req.Card2)
+
+	// 复活：HP=1，抽 N 张牌
+	p.HP = 1
+	if drawN > 0 {
+		p.Hand.DrawIntoHand(p.Deck, drawN)
+	}
+
+	// 关闭对话框
+	e.state.AwaitingRevive = -1
+	e.state.ReviveDeadline = time.Time{}
+
+	slog.Info("suou: revive success", "seat", seat, "draw", drawN, "synth", c1.Synthesized && c2.Synthesized)
+	e.sendPlayerStatus(seat)
+	e.broadcastState("suou revive success")
+}
+
+// hcIntDefault 是 hooks_config 数值读取的本地辅助（与 character.hcInt 同语义）。
+// 放在 game 包内，避免在 character 包暴露 hcInt。
+func hcIntDefault(cfg map[string]any, key string, defVal int) int {
+	if cfg == nil {
+		return defVal
+	}
+	v, ok := cfg[key]
+	if !ok {
+		return defVal
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	}
+	return defVal
+}
+
+// resolveCardRef 根据 CardRef 在玩家手牌区/合成区取出对应槽位的牌（不消耗）。
+// Zone 非法或槽位为空时返回 nil。
+func (e *Engine) resolveCardRef(p *PlayerState, ref protocol.CardRef) *card.Card {
+	switch ref.Zone {
+	case "hand":
+		return p.Hand.HandCard(ref.Slot)
+	case "synth":
+		return p.Hand.SynthCard(ref.Slot)
+	default:
+		return nil
+	}
+}
+
+// consumeCardRef 销毁指定 CardRef 引用的牌（槽位置 nil）。
+// 仅在 handleRevive 校验通过后调用；调用前需用 resolveCardRef 确认牌存在。
+func (e *Engine) consumeCardRef(p *PlayerState, ref protocol.CardRef) {
+	switch ref.Zone {
+	case "hand":
+		_, _ = p.Hand.TakeHand(ref.Slot)
+	case "synth":
+		_, _ = p.Hand.TakeSynth(ref.Slot)
+	}
+}
+
+// enterAwaitingRevive 蘇芳 HP 归零后开启 15s 复活对话框。
+//   - 设置 state.AwaitingRevive=seat、ReviveDeadline
+//   - 广播 MsgDeathDialogEv
+//   - 启动一个超时 goroutine，在到期时向 actionCh 投递 msgReviveTimeoutSentinel；
+//     handleRevive 成功复活时不会取消该 goroutine（也无需取消，因为 sentinel 到达
+//     时 AwaitingRevive 已被重置为 -1，processAction 会忽略它）。
+func (e *Engine) enterAwaitingRevive(seat int) {
+	timeoutSec := e.reviveTimeoutSec
+	if timeoutSec <= 0 {
+		timeoutSec = 15
+	}
+	deadline := time.Now().Add(time.Duration(timeoutSec) * time.Second)
+	e.state.AwaitingRevive = seat
+	e.state.ReviveDeadline = deadline
+
+	slog.Info("suou: entering revive dialog", "seat", seat, "timeout_sec", timeoutSec)
+	e.room.Broadcast(protocol.MsgDeathDialogEv, protocol.MustEncode(protocol.DeathDialogEv{
+		Seat:        seat,
+		DeadlineMS:  deadline.UnixMilli(),
+		DurationSec: timeoutSec,
+	}))
+
+	// 启动超时 goroutine：到期后投递哨兵动作。
+	// 使用 SubmitAction 保证：若引擎已停止（ctx 已取消），select 走 <-e.ctx.Done() 分支，
+	// 哨兵被丢弃，无 goroutine 泄漏。
+	go func(s int, dur time.Duration) {
+		t := time.NewTimer(dur)
+		defer t.Stop()
+		select {
+		case <-t.C:
+			e.SubmitAction(s, msgReviveTimeoutSentinel, nil)
+		case <-e.ctx.Done():
+			return
+		}
+	}(seat, time.Duration(timeoutSec)*time.Second)
+}
+
+// finalizeRealDeath 蘇芳复活流程失败（超时或玩家放弃）→ 真正死亡，对手获胜。
+// reason 写入 GameOverEv.Reason（如 "suou_revive_timeout"）。
+func (e *Engine) finalizeRealDeath(loseSeat int, reason string) {
+	if e.state.isOver() {
+		return
+	}
+	winner := 1 - loseSeat
+	e.state.Phase = PhaseGameOver
+	e.state.Winner = winner
+	e.state.AwaitingRevive = -1
+
+	slog.Info("suou: revive failed, real death", "loser_seat", loseSeat, "reason", reason)
+	e.room.Broadcast(protocol.MsgGameOverEv, protocol.MustEncode(protocol.GameOverEv{
+		WinnerSeat: winner,
+		Reason:     reason,
+	}))
+	e.Stop()
+}
+
+// handleSurrender 处理 MsgSurrenderReq：投降方判负，对手立即获胜。
+// 客户端已完成二次确认，服务端不再做额外校验。
+// 若游戏已结束（isOver），静默忽略（幂等），避免覆盖既有胜者。
+func (e *Engine) handleSurrender(seat int) {
+	if e.state.isOver() {
+		slog.Info("surrender ignored, game already over",
+			"gameID", e.state.GameID, "seat", seat, "winner", e.state.Winner)
+		return
+	}
+	winner := 1 - seat
+	e.state.Phase = PhaseGameOver
+	e.state.Winner = winner
+
+	slog.Info("surrender", "loser_seat", seat, "winner_seat", winner)
+	e.room.Broadcast(protocol.MsgGameOverEv, protocol.MustEncode(protocol.GameOverEv{
+		WinnerSeat: winner,
+		Reason:     "surrender",
+	}))
+	// 停止引擎主循环：与 hp_zero 路径一致（state.isOver 在 run/runAction 中
+	// 被检查后退出 goroutine），同时显式 cancel ctx 让正在 select 的 actionCh
+	// 立刻醒来收尾。
+	e.Stop()
+}
+
 // runCleanup 清场阶段，返回 true 表示游戏已结束。
 func (e *Engine) runCleanup() bool {
 	e.state.Phase = PhaseCleanup
@@ -1028,7 +1284,14 @@ func (e *Engine) runCleanup() bool {
 		}
 
 		// 清除弃牌区（手牌区槽位 5-8）
-		p.Hand.ClearDiscardZone()
+		// 角色钩子 SkipCleanup 可整体跳过本玩家的弃牌区清理（蘇芳：本回合未出过攻击牌时）。
+		skip := false
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.SkipCleanup != nil {
+			skip = p.Char.Def.Hooks.SkipCleanup(p.Char.ExtraState)
+		}
+		if !skip {
+			p.Hand.ClearDiscardZone()
+		}
 
 		// 赐福判定：HP < 40 且尚未触发
 		if p.HP < 40 && !p.BlessingUsed {

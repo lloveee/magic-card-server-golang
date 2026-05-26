@@ -156,6 +156,38 @@ type TriggerLibrateReq struct{}
 // 双方都结束行动后，进入交战结算阶段。
 type EndActionReq struct{}
 
+// SurrenderReq C→S 投降。客户端已完成二次确认。
+// 服务端收到后立即结束对局，发送方判负，对手获胜。
+type SurrenderReq struct{}
+
+// CardRef 用于在请求中引用一张手牌或合成区的牌。
+// Zone: "hand" | "synth"；Slot: 1-indexed。
+// 用途：蘇芳 ReviveReq 引用两张准备消耗的牌。
+type CardRef struct {
+	Zone string `json:"zone"`
+	Slot int    `json:"slot"`
+}
+
+// ReviveReq C→S 蘇芳：复活对话框内提交两张手牌请求复活。
+// 校验通过的合法组合（任选其一）：
+//   - 两张未合成牌、同大色、同点数 → 复活 1HP，抽 4
+//   - 两张已合成牌、同大色 → 复活 1HP，抽 8
+// 校验失败返回 ErrCodeInvalidReviveCards (1010)，玩家可重试。
+// 不发或对话框超时 → 真死亡（对手胜，Reason="suou_revive_timeout"）。
+type ReviveReq struct {
+	Card1 CardRef `json:"card1"`
+	Card2 CardRef `json:"card2"`
+}
+
+// DeathDialogEv S→C 蘇芳：HP 归零进入 15s 复活对话框。
+// 客户端收到后弹出复活对话框，由对应玩家拖入两张牌并发送 ReviveReq。
+// 在对话框开启期间，对手的操作被冻结（仅放行 MsgReviveReq 与 MsgSurrenderReq）。
+type DeathDialogEv struct {
+	Seat        int   `json:"seat"`         // 进入复活对话框的玩家座位
+	DeadlineMS  int64 `json:"deadline_ms"`  // Unix 毫秒：对话框超时时刻
+	DurationSec int   `json:"duration_sec"` // 总时长（=15）
+}
+
 // DefenseReq C→S 防御出牌，响应对手的来袭攻击。
 // Pass=true：放弃防御，承受全部伤害。
 // Pass=false：用指定槽位的牌抵消对应点数的伤害。
@@ -291,5 +323,6 @@ const (
 	ErrCodeSkillNoCard     = 1005 // 手中无技能牌
 	ErrCodeSkillThreshold  = 1006 // 技能牌点数不足
 	ErrCodeLibrateNotReady = 1007 // 能量未达到解放阈值
-	ErrCodeNotYourTurn     = 1008 // 不是你的行动回合
+	ErrCodeNotYourTurn        = 1008 // 不是你的行动回合
+	ErrCodeInvalidReviveCards = 1010 // 蘇芳：复活对话框提交的两张牌不符合规则
 )

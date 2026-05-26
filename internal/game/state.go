@@ -1,6 +1,8 @@
 package game
 
 import (
+	"time"
+
 	"echo/internal/game/card"
 	"echo/internal/game/character"
 	"echo/internal/game/field"
@@ -91,12 +93,27 @@ func newPlayerState(seat int) *PlayerState {
 // 不再受角色 MaxHandSize 钩子影响——MaxHandSize 仅用于"技能内抽牌"的回合内上限
 // 校验（见 engine.applySkillResult 中 DrawCards 的处理）。这与设计相符：
 // 每回合开始双方均按固定 8 张补牌，律花的"能量=手牌上限"只在出技能牌时生效。
+//
+// 角色钩子 FillTargetSize 可覆盖默认目标张数（蘇芳=4）。
+// 完成基础补牌后调用 BonusFillDraw（蘇芳：上回合跳过清场则额外补 +4）。
 func (p *PlayerState) drawCards() {
 	maxSlots := card.HandZoneSize
 	if p.IsNearDeath {
 		maxSlots = card.SafeZoneSize // 濒死只能补安全区
 	}
+	// 钩子：FillTargetSize（覆盖补牌目标，蘇芳=4）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.FillTargetSize != nil {
+		if n := p.Char.Def.Hooks.FillTargetSize(p.Char.ExtraState); n > 0 {
+			maxSlots = n
+		}
+	}
 	p.Hand.Fill(p.Deck, maxSlots)
+	// 钩子：BonusFillDraw（基础补牌完成后额外抽牌，蘇芳：上回合跳过清场后 +4）
+	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.BonusFillDraw != nil {
+		if extra := p.Char.Def.Hooks.BonusFillDraw(p.Char.ExtraState); extra > 0 {
+			p.Hand.DrawIntoHand(p.Deck, extra)
+		}
+	}
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -133,16 +150,26 @@ type GameState struct {
 
 	// Winner：-1 = 游戏未结束，0 or 1 = 获胜方座位
 	Winner int
+
+	// AwaitingRevive：蘇芳 HP 归零后的 15s 复活对话框正在进行中，
+	// 值为对话框开启的玩家座位（0 or 1）；-1 表示无人在复活。
+	// 该状态期间，对手的所有行动消息均被 action-dispatcher 阻拦，
+	// 仅放行 MsgReviveReq（来自复活方）与 MsgSurrenderReq（来自任一方）。
+	AwaitingRevive int
+
+	// ReviveDeadline 复活对话框的超时时刻（仅 AwaitingRevive != -1 时有效）。
+	ReviveDeadline time.Time
 }
 
 // newGameState 创建初始游戏状态。
 func newGameState(gameID string) *GameState {
 	return &GameState{
-		GameID:  gameID,
-		Round:   0,
-		Phase:   PhaseWaiting,
-		Players: [2]*PlayerState{newPlayerState(0), newPlayerState(1)},
-		Winner:  -1,
+		GameID:         gameID,
+		Round:          0,
+		Phase:          PhaseWaiting,
+		Players:        [2]*PlayerState{newPlayerState(0), newPlayerState(1)},
+		Winner:         -1,
+		AwaitingRevive: -1,
 	}
 }
 

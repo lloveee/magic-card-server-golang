@@ -97,10 +97,31 @@ type CharHooks struct {
 	// 用途：节律者要求本回合每次技能点数不得低于上一次。
 	PreUseSkillCheck func(cardPoints int, es map[string]any) error
 
-	// MaxHandSize 在补牌阶段（Fill）调用，返回该角色当前的手牌上限。
+	// MaxHandSize 用于"技能内抽牌"的回合内上限校验（如律花：手牌上限=能量值）。
 	// 返回值会被引擎 clamp 到 [1, HandZoneSize]；返回 0 表示沿用引擎默认（HandZoneSize 或濒死 SafeZoneSize）。
 	// 引擎传入当前能量值，便于实现"手牌上限=能量"等动态被动。
+	// 注意：补牌阶段（drawCards/Fill）使用 FillTargetSize（见下方），不再走此钩子。
 	MaxHandSize func(es map[string]any, energy int) int
+
+	// ── 补牌阶段钩子（蘇芳专用） ───────────────────────────────────
+	//
+	// 这三个钩子专为蘇芳（30/30 HP，4 张基础手牌，无攻击则跳过清场并下回合补 +4）实现，
+	// 其他角色保持 nil 即沿用引擎默认行为，无任何副作用。
+
+	// FillTargetSize 在 drawCards/Fill 调用，返回该角色补牌阶段应补到的总张数。
+	// 返回 0 表示沿用引擎默认值（HandZoneSize=8 或濒死 SafeZoneSize=4）。
+	// 蘇芳：始终返回 4。
+	FillTargetSize func(es map[string]any) int
+
+	// SkipCleanup 在清场阶段开始调用，返回 true 表示跳过本玩家的弃牌区清理。
+	// 钩子内部自负责消费 flag（仅 cleanup 这一次生效）。
+	// 蘇芳：本回合未出过攻击牌时返回 true。
+	SkipCleanup func(es map[string]any) bool
+
+	// BonusFillDraw 在 drawCards/Fill 完成基础补牌之后调用，返回需要额外补抽的张数。
+	// 钩子负责消费/重置 flag。返回 0 表示无额外补抽。
+	// 蘇芳：上一回合跳过清场后，本回合额外补 +4。
+	BonusFillDraw func(es map[string]any) int
 }
 
 // esInt 从 ExtraState 读取 int 值，键不存在或类型不符时返回 defVal。

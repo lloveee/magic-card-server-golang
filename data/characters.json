@@ -415,5 +415,45 @@
     "name": "结城",
     "normal": {},
     "passive": {}
+  },
+  {
+    "id": "rokka",
+    "name": "六華",
+    "max_hp": 100,
+    "max_energy": 100,
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "normal": {},
+    "enhanced": {},
+    "lib": {},
+    "passive": {},
+    "hooks_config": {
+      "hand_size_cap": 15,
+      "lit_eyes_needed": 3,
+      "triangle_heal": 5,
+      "triangle_draw": 3,
+      "adjacent_draw": 8,
+      "other_damage": 5,
+      "other_draw": 5
+    }
+  },
+  {
+    "id": "suou",
+    "name": "蘇芳",
+    "max_hp": 30,
+    "max_energy": 30,
+    "lib_threshold": 0,
+    "manual_lib": false,
+    "normal": {},
+    "enhanced": {},
+    "lib": {},
+    "passive": {},
+    "hooks_config": {
+      "fill_base": 4,
+      "skip_cleanup_bonus": 4,
+      "revive_timeout_sec": 15,
+      "revive_unsynth_draw": 4,
+      "revive_synth_draw": 8
+    }
   }
 ]
