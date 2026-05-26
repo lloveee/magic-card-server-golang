@@ -1066,13 +1066,121 @@ func (e *Engine) triggerDeath(loseSeat int) {
 	}))
 }
 
-// handleRevive 蘇芳复活流程（Phase 4.8 实装）。
-// Phase 4.4 阶段先放占位，仅返回错误确保 action-dispatcher 路由编译通过。
+// handleRevive 蘇芳复活流程：玩家拖入两张手牌请求复活。
+//
+// 合法组合：
+//   - 两张未合成、同大色、同点数 → 1HP 复活、抽 revive_unsynth_draw 张 (默认 4)
+//   - 两张已合成、同大色             → 1HP 复活、抽 revive_synth_draw 张 (默认 8)
+//
+// 校验失败：返回 ErrCodeInvalidReviveCards，AwaitingRevive 保持开启，
+// 玩家可重试（超时 goroutine 仍在运行）。
+// 成功：消耗两张牌、HP=1、抽对应张数、关闭 AwaitingRevive、广播状态。
 func (e *Engine) handleRevive(seat int, payload []byte) {
-	_ = seat
-	_ = payload
-	// Phase 4.8 将替换为完整校验 + 复活 / 拒绝逻辑。
-	e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "复活功能尚未实装")
+	req, err := protocol.Decode[protocol.ReviveReq](payload)
+	if err != nil {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "无效请求格式")
+		return
+	}
+
+	p := e.state.Players[seat]
+	c1 := e.resolveCardRef(p, req.Card1)
+	c2 := e.resolveCardRef(p, req.Card2)
+	if c1 == nil || c2 == nil {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "指定槽位为空")
+		return
+	}
+	// 两张引用必须指向不同的牌实例
+	if c1 == c2 {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "不能选择同一张牌两次")
+		return
+	}
+
+	// 必须同大色
+	if c1.Suit.Color() != c2.Suit.Color() {
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "两张牌大色不同")
+		return
+	}
+
+	cfg := character.HooksConfig("suou")
+	unsynthDraw := hcIntDefault(cfg, "revive_unsynth_draw", 4)
+	synthDraw := hcIntDefault(cfg, "revive_synth_draw", 8)
+
+	var drawN int
+	switch {
+	case !c1.Synthesized && !c2.Synthesized:
+		// 两张未合成 + 同色 → 必须同点数
+		if c1.Points != c2.Points {
+			e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "两张未合成牌点数不同")
+			return
+		}
+		drawN = unsynthDraw
+	case c1.Synthesized && c2.Synthesized:
+		drawN = synthDraw
+	default:
+		e.sendError(seat, protocol.ErrCodeInvalidReviveCards, "两张牌合成状态不一致")
+		return
+	}
+
+	// 校验通过 → 消耗两张牌
+	e.consumeCardRef(p, req.Card1)
+	e.consumeCardRef(p, req.Card2)
+
+	// 复活：HP=1，抽 N 张牌
+	p.HP = 1
+	if drawN > 0 {
+		p.Hand.DrawIntoHand(p.Deck, drawN)
+	}
+
+	// 关闭对话框
+	e.state.AwaitingRevive = -1
+	e.state.ReviveDeadline = time.Time{}
+
+	slog.Info("suou: revive success", "seat", seat, "draw", drawN, "synth", c1.Synthesized && c2.Synthesized)
+	e.sendPlayerStatus(seat)
+	e.broadcastState("suou revive success")
+}
+
+// hcIntDefault 是 hooks_config 数值读取的本地辅助（与 character.hcInt 同语义）。
+// 放在 game 包内，避免在 character 包暴露 hcInt。
+func hcIntDefault(cfg map[string]any, key string, defVal int) int {
+	if cfg == nil {
+		return defVal
+	}
+	v, ok := cfg[key]
+	if !ok {
+		return defVal
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	}
+	return defVal
+}
+
+// resolveCardRef 根据 CardRef 在玩家手牌区/合成区取出对应槽位的牌（不消耗）。
+// Zone 非法或槽位为空时返回 nil。
+func (e *Engine) resolveCardRef(p *PlayerState, ref protocol.CardRef) *card.Card {
+	switch ref.Zone {
+	case "hand":
+		return p.Hand.HandCard(ref.Slot)
+	case "synth":
+		return p.Hand.SynthCard(ref.Slot)
+	default:
+		return nil
+	}
+}
+
+// consumeCardRef 销毁指定 CardRef 引用的牌（槽位置 nil）。
+// 仅在 handleRevive 校验通过后调用；调用前需用 resolveCardRef 确认牌存在。
+func (e *Engine) consumeCardRef(p *PlayerState, ref protocol.CardRef) {
+	switch ref.Zone {
+	case "hand":
+		_, _ = p.Hand.TakeHand(ref.Slot)
+	case "synth":
+		_, _ = p.Hand.TakeSynth(ref.Slot)
+	}
 }
 
 // enterAwaitingRevive 蘇芳 HP 归零后开启 15s 复活对话框。

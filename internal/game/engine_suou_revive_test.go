@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"echo/internal/game/card"
 	"echo/internal/game/character"
 	"echo/internal/player"
 	"echo/internal/protocol"
@@ -124,3 +125,140 @@ func TestSuouReviveTimeout(t *testing.T) {
 	}
 	_ = protocol.MsgDeathDialogEv // keep protocol import referenced
 }
+
+// ════════════════════════════════════════════════════════════════
+//  Phase 4.8 — handleRevive 校验测试
+// ════════════════════════════════════════════════════════════════
+
+// placeHandCard 在指定 slot 强制放牌（覆盖空槽）。仅供测试 setup 使用。
+func placeHandCard(t *testing.T, p *PlayerState, slot int, c *card.Card) {
+	t.Helper()
+	// 取走原有牌（可能为 nil），再放入新牌
+	_, _ = p.Hand.TakeHand(slot)
+	if err := p.Hand.PlaceHand(slot, c); err != nil {
+		t.Fatalf("placeHandCard slot=%d: %v", slot, err)
+	}
+}
+
+func placeSynthCard(t *testing.T, p *PlayerState, slot int, c *card.Card) {
+	t.Helper()
+	_, _ = p.Hand.TakeSynth(slot)
+	if err := p.Hand.PutSynthAt(c, slot); err != nil {
+		t.Fatalf("placeSynthCard slot=%d: %v", slot, err)
+	}
+}
+
+// TestSuouReviveUnsynthSameColorSamePoints: 两张未合成、同色、同点数 → HP=1，抽 4。
+func TestSuouReviveUnsynthSameColorSamePoints(t *testing.T) {
+	e := newSuouTestEngine(t, 60)
+	p := e.state.Players[0]
+
+	// 准备两张未合成牌：红桃 3 + 方片 3（同红色，同点数 3）
+	c1 := card.New(card.SuitHeart, card.TypeAttack, 3)
+	c2 := card.New(card.SuitDiamond, card.TypeAttack, 3)
+	placeHandCard(t, p, 1, c1)
+	placeHandCard(t, p, 2, c2)
+
+	// 触发复活对话框
+	e.applyDamage(0, 100, "test lethal")
+	if e.state.AwaitingRevive != 0 {
+		t.Fatalf("setup: AwaitingRevive = %d, want 0", e.state.AwaitingRevive)
+	}
+	handCountBefore := p.Hand.HandCount()
+
+	// 发送 ReviveReq
+	req := protocol.MustEncode(protocol.ReviveReq{
+		Card1: protocol.CardRef{Zone: "hand", Slot: 1},
+		Card2: protocol.CardRef{Zone: "hand", Slot: 2},
+	})
+	e.processAction(action{Seat: 0, MsgID: protocol.MsgReviveReq, Payload: req})
+
+	if e.state.AwaitingRevive != -1 {
+		t.Fatalf("AwaitingRevive = %d, want -1 (dialog closed)", e.state.AwaitingRevive)
+	}
+	if p.HP != 1 {
+		t.Fatalf("HP = %d, want 1 (suou revived at 1 HP)", p.HP)
+	}
+	// 两张牌已被消耗，再抽 4 → 净变化 = -2 + 4 = +2
+	if got := p.Hand.HandCount() - handCountBefore; got != 2 {
+		t.Fatalf("hand count delta = %d, want +2 (consume 2, draw 4)", got)
+	}
+}
+
+// TestSuouReviveSynthSameColor: 两张已合成、同色 → HP=1，抽 8。
+func TestSuouReviveSynthSameColor(t *testing.T) {
+	e := newSuouTestEngine(t, 60)
+	p := e.state.Players[0]
+
+	// 准备两张已合成牌（点数不同也可以，因为合成路径不检查点数）
+	c1 := card.New(card.SuitSpade, card.TypeAttack, 5)
+	c1.Synthesized = true
+	c2 := card.New(card.SuitClub, card.TypeAttack, 7)
+	c2.Synthesized = true
+	placeSynthCard(t, p, 1, c1)
+	placeSynthCard(t, p, 2, c2)
+
+	e.applyDamage(0, 100, "test lethal")
+	handCountBefore := p.Hand.HandCount()
+
+	req := protocol.MustEncode(protocol.ReviveReq{
+		Card1: protocol.CardRef{Zone: "synth", Slot: 1},
+		Card2: protocol.CardRef{Zone: "synth", Slot: 2},
+	})
+	e.processAction(action{Seat: 0, MsgID: protocol.MsgReviveReq, Payload: req})
+
+	if e.state.AwaitingRevive != -1 {
+		t.Fatalf("AwaitingRevive = %d, want -1", e.state.AwaitingRevive)
+	}
+	if p.HP != 1 {
+		t.Fatalf("HP = %d, want 1", p.HP)
+	}
+	// 合成区的两张牌被消耗（不影响 HandCount），抽 8 进 hand → +8
+	if got := p.Hand.HandCount() - handCountBefore; got != 8 {
+		t.Fatalf("hand count delta = %d, want +8 (consume from synth, draw 8 into hand)", got)
+	}
+	if p.Hand.SynthCount() != 0 {
+		t.Fatalf("synth count = %d, want 0 (both synth cards consumed)", p.Hand.SynthCount())
+	}
+}
+
+// TestSuouReviveInvalidRejects: 不合法组合 (异色) → ErrCodeInvalidReviveCards，
+// AwaitingRevive 保持开启，HP 仍为 0。
+func TestSuouReviveInvalidRejects(t *testing.T) {
+	e := newSuouTestEngine(t, 60)
+	p := e.state.Players[0]
+
+	// 红桃 3 + 黑桃 3：同点数，但异色 → 不合法
+	c1 := card.New(card.SuitHeart, card.TypeAttack, 3)
+	c2 := card.New(card.SuitSpade, card.TypeAttack, 3)
+	placeHandCard(t, p, 1, c1)
+	placeHandCard(t, p, 2, c2)
+
+	e.applyDamage(0, 100, "test lethal")
+	hpBefore := p.HP
+	if hpBefore > 0 {
+		t.Fatalf("setup: HP = %d, want <= 0 after lethal", hpBefore)
+	}
+	handCountBefore := p.Hand.HandCount()
+
+	req := protocol.MustEncode(protocol.ReviveReq{
+		Card1: protocol.CardRef{Zone: "hand", Slot: 1},
+		Card2: protocol.CardRef{Zone: "hand", Slot: 2},
+	})
+	e.processAction(action{Seat: 0, MsgID: protocol.MsgReviveReq, Payload: req})
+
+	// 对话框仍然开着，HP 没变，两张牌还在原位
+	if e.state.AwaitingRevive != 0 {
+		t.Fatalf("AwaitingRevive = %d, want 0 (dialog must remain open after rejection)", e.state.AwaitingRevive)
+	}
+	if p.HP != hpBefore {
+		t.Fatalf("HP changed to %d (was %d) after rejected revive; must not change", p.HP, hpBefore)
+	}
+	if got := p.Hand.HandCount(); got != handCountBefore {
+		t.Fatalf("hand count = %d, want %d (rejected revive must not consume cards)", got, handCountBefore)
+	}
+	if p.Hand.HandCard(1) != c1 || p.Hand.HandCard(2) != c2 {
+		t.Fatal("rejected revive must leave both cards in their original slots")
+	}
+}
+
