@@ -63,4 +63,6 @@ const (
 	MsgCardPlayedEv     uint16 = 5012 // S→C 卡牌打出通知（双方可见，用于显示出牌区）
 	MsgGameConfigReq    uint16 = 4008 // C→S 客户端请求完整游戏配置（hash不匹配时）
 	MsgSurrenderReq     uint16 = 4009 // C→S 投降（已二次确认）；服务端立即结束对局，发送方判负
+	MsgReviveReq        uint16 = 4010 // C→S 蘇芳：复活对话框内提交两张手牌请求复活
+	MsgDeathDialogEv    uint16 = 5013 // S→C 蘇芳：HP 归零进入 15s 复活对话框
 )
