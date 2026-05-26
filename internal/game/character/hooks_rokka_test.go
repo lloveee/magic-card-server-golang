@@ -1,0 +1,42 @@
+package character
+
+import "testing"
+
+// TestRokkaActivation 验证：6 张技能牌依次打出后，eyes_points 与 activation_idx 正确，
+// 不产生技能效果（SkillResult 全零）。
+func TestRokkaActivation(t *testing.T) {
+	def := MustGet("rokka")
+	if def.Hooks == nil || def.Hooks.UseSkillOverride == nil {
+		t.Fatal("rokka must have UseSkillOverride hook")
+	}
+
+	es := map[string]any{}
+	points := []int{3, 5, 2, 4, 2, 1}
+	for i, p := range points {
+		result, cost, handled := def.Hooks.UseSkillOverride(p, es)
+		if !handled {
+			t.Fatalf("step %d: not handled", i)
+		}
+		if cost != 0 {
+			t.Fatalf("step %d: cost=%d, want 0", i, cost)
+		}
+		if result == nil || result.DealDirectDamage != 0 || result.HealSelf != 0 || result.DrawCards != 0 {
+			t.Fatalf("step %d: result should be zero, got %+v", i, result)
+		}
+	}
+
+	idx := esInt(es, "rokka_activation_idx", -1)
+	if idx != 6 {
+		t.Fatalf("activation_idx=%d, want 6", idx)
+	}
+
+	eyes, ok := es["rokka_eyes_points"].([6]int)
+	if !ok {
+		t.Fatalf("eyes_points type wrong: %T", es["rokka_eyes_points"])
+	}
+	for i, p := range points {
+		if eyes[i] != p {
+			t.Fatalf("eyes[%d]=%d, want %d", i, eyes[i], p)
+		}
+	}
+}
