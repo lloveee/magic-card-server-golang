@@ -62,4 +62,5 @@ const (
 	MsgGameConfigEv     uint16 = 5011 // S→C 游戏配置下发（角色+场地数据）
 	MsgCardPlayedEv     uint16 = 5012 // S→C 卡牌打出通知（双方可见，用于显示出牌区）
 	MsgGameConfigReq    uint16 = 4008 // C→S 客户端请求完整游戏配置（hash不匹配时）
+	MsgSurrenderReq     uint16 = 4009 // C→S 投降（已二次确认）；服务端立即结束对局，发送方判负
 )

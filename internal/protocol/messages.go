@@ -156,6 +156,10 @@ type TriggerLibrateReq struct{}
 // 双方都结束行动后，进入交战结算阶段。
 type EndActionReq struct{}
 
+// SurrenderReq C→S 投降。客户端已完成二次确认。
+// 服务端收到后立即结束对局，发送方判负，对手获胜。
+type SurrenderReq struct{}
+
 // DefenseReq C→S 防御出牌，响应对手的来袭攻击。
 // Pass=true：放弃防御，承受全部伤害。
 // Pass=false：用指定槽位的牌抵消对应点数的伤害。
