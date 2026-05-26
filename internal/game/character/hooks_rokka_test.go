@@ -77,3 +77,42 @@ func TestRokkaRejectNoMatch(t *testing.T) {
 		t.Fatal("expected error for no-match skill play")
 	}
 }
+
+// TestRokkaEquilateral 验证等边三角形 {0,2,4} 与 {1,3,5}。
+func TestRokkaEquilateral(t *testing.T) {
+	r := rokkaEvaluateGeometry([]int{0, 2, 4})
+	if r.HealSelf != 5 || r.DrawCards != 3 {
+		t.Fatalf("{0,2,4} → %+v, want heal=5 draw=3", r)
+	}
+	r = rokkaEvaluateGeometry([]int{1, 3, 5})
+	if r.HealSelf != 5 || r.DrawCards != 3 {
+		t.Fatalf("{1,3,5} → %+v, want heal=5 draw=3", r)
+	}
+}
+
+// TestRokkaAdjacent 验证三个相邻位（含跨界）。
+func TestRokkaAdjacent(t *testing.T) {
+	cases := [][]int{
+		{0, 1, 2}, {1, 2, 3}, {2, 3, 4}, {3, 4, 5},
+		{4, 5, 0}, {5, 0, 1},
+	}
+	for _, c := range cases {
+		r := rokkaEvaluateGeometry(c)
+		if r.DrawCards != 8 || r.HealSelf != 0 || r.DealDirectDamage != 0 {
+			t.Fatalf("%v → %+v, want draw=8 only", c, r)
+		}
+	}
+}
+
+// TestRokkaOther 验证其他情况：造成 5 伤害 + 抽 5 牌。
+func TestRokkaOther(t *testing.T) {
+	cases := [][]int{
+		{0, 1, 3}, {0, 2, 3}, {0, 3, 5}, {1, 2, 4},
+	}
+	for _, c := range cases {
+		r := rokkaEvaluateGeometry(c)
+		if r.DealDirectDamage != 5 || r.DrawCards != 5 {
+			t.Fatalf("%v → %+v, want dmg=5 draw=5", c, r)
+		}
+	}
+}

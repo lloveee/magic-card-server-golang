@@ -1,6 +1,9 @@
 package character
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 func init() {
 	// 六華：六角大阵——按技能牌使用顺序激活六眼，激活后凭点数匹配点亮三眼触发效果。
@@ -92,7 +95,56 @@ func rokkaFindEye(eyes [6]int, lit []int, pts int) int {
 	return -1
 }
 
-// rokkaEvaluateGeometry 占位，Task 3.4 实现真正逻辑
-func rokkaEvaluateGeometry(_ []int) *SkillResult {
-	return &SkillResult{Desc: "六華大阵：三眼结算 (TODO Task 3.4)"}
+// rokkaEquilateralSets 是等边三角形眼位集合（已排序）。
+var rokkaEquilateralSets = [][3]int{
+	{0, 2, 4},
+	{1, 3, 5},
+}
+
+// rokkaAdjacentSets 是三个相邻位（含跨界）的眼位集合（未排序，按顺序定义）。
+var rokkaAdjacentSets = [][3]int{
+	{0, 1, 2}, {1, 2, 3}, {2, 3, 4}, {3, 4, 5},
+	{4, 5, 0}, {5, 0, 1},
+}
+
+// rokkaEvaluateGeometry 根据三个点亮眼位的几何形状返回结算结果。
+//   - 等边三角形（{0,2,4} 或 {1,3,5}）：回血 5、抽 3
+//   - 三连邻接（含跨界）：抽 8
+//   - 其他：造成 5 点直接伤害 + 抽 5
+func rokkaEvaluateGeometry(lit []int) *SkillResult {
+	if len(lit) != 3 {
+		return &SkillResult{}
+	}
+	s := append([]int(nil), lit...)
+	sort.Ints(s)
+	key := [3]int{s[0], s[1], s[2]}
+
+	for _, eq := range rokkaEquilateralSets {
+		if key == eq {
+			return &SkillResult{
+				Tier:      TierEnhanced,
+				HealSelf:  5,
+				DrawCards: 3,
+				Desc:      "六華·等边：回复 5 血并补 3 张牌",
+			}
+		}
+	}
+	for _, adj := range rokkaAdjacentSets {
+		var sa [3]int
+		copy(sa[:], adj[:])
+		sort.Ints(sa[:])
+		if key == sa {
+			return &SkillResult{
+				Tier:      TierEnhanced,
+				DrawCards: 8,
+				Desc:      "六華·邻接：补 8 张牌",
+			}
+		}
+	}
+	return &SkillResult{
+		Tier:             TierEnhanced,
+		DealDirectDamage: 5,
+		DrawCards:        5,
+		Desc:             "六華·杂阵：造成 5 伤害并补 5 张牌",
+	}
 }
