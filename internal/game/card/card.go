@@ -6,61 +6,77 @@ import (
 )
 
 // ════════════════════════════════════════════════════════════════
-//  大系（Major Faction）
+//  Color (大色) — 红 / 黑
 // ════════════════════════════════════════════════════════════════
 
-// MajorFaction 是牌的大类归属，决定合成时用乘算还是加算。
-type MajorFaction int8
+// Color 是牌的大色归属（红/黑），决定合成时用乘算还是加算。
+type Color int8
 
 const (
-	MajorFantasy MajorFaction = 0 // 梦幻系（梦境 + 虚幻）
-	MajorReturn  MajorFaction = 1 // 重回系（重组 + 轮回）
+	ColorRed   Color = 0 // 红 (♥ + ♦)
+	ColorBlack Color = 1 // 黑 (♠ + ♣)
 )
 
-func (m MajorFaction) String() string {
-	switch m {
-	case MajorFantasy:
-		return "梦幻"
-	case MajorReturn:
-		return "重回"
+func (c Color) String() string {
+	switch c {
+	case ColorRed:
+		return "红"
+	case ColorBlack:
+		return "黑"
 	default:
 		return "未知"
 	}
 }
 
 // ════════════════════════════════════════════════════════════════
-//  子系（SubFaction）
+//  Suit (花色)
 // ════════════════════════════════════════════════════════════════
 
-// SubFaction 是牌的具体派系，两个大系各含两个子系。
-// 子系信息在场地效果中有用（轮回之境、虚幻之境分别针对轮回牌、虚幻牌）。
-type SubFaction int8
+// Suit 是牌的具体花色，两种大色各含两个花色。
+// 子系信息在场地效果中有用（黑桃之境、方片之境分别针对黑桃牌、方片牌）。
+type Suit int8
 
 const (
-	SubDream         SubFaction = 0 // 梦境（梦幻系）
-	SubIllusion      SubFaction = 1 // 虚幻（梦幻系）
-	SubReform        SubFaction = 2 // 重组（重回系）
-	SubReincarnation SubFaction = 3 // 轮回（重回系）
+	SuitHeart   Suit = 0 // ♥ 红桃 (红色)
+	SuitDiamond Suit = 1 // ♦ 方片 (红色)
+	SuitClub    Suit = 2 // ♣ 梅花 (黑色)
+	SuitSpade   Suit = 3 // ♠ 黑桃 (黑色)
 )
 
-// Major 返回该子系所属的大系。
-func (sf SubFaction) Major() MajorFaction {
-	if sf == SubDream || sf == SubIllusion {
-		return MajorFantasy
+// Color 返回该花色所属的大色。
+func (s Suit) Color() Color {
+	if s == SuitHeart || s == SuitDiamond {
+		return ColorRed
 	}
-	return MajorReturn
+	return ColorBlack
 }
 
-func (sf SubFaction) String() string {
-	switch sf {
-	case SubDream:
-		return "梦境"
-	case SubIllusion:
-		return "虚幻"
-	case SubReform:
-		return "重组"
-	case SubReincarnation:
-		return "轮回"
+// Symbol 返回 Unicode 花色符号，用于协议传输与 UI 渲染。
+func (s Suit) Symbol() string {
+	switch s {
+	case SuitHeart:
+		return "♥"
+	case SuitDiamond:
+		return "♦"
+	case SuitClub:
+		return "♣"
+	case SuitSpade:
+		return "♠"
+	default:
+		return "?"
+	}
+}
+
+func (s Suit) String() string {
+	switch s {
+	case SuitHeart:
+		return "红桃"
+	case SuitDiamond:
+		return "方片"
+	case SuitClub:
+		return "梅花"
+	case SuitSpade:
+		return "黑桃"
 	default:
 		return "未知"
 	}
@@ -127,7 +143,7 @@ const (
 //   - 协议层（CardView.Points = nil）用于表达这个状态
 type Card struct {
 	ID          string
-	SubFaction  SubFaction
+	Suit        Suit
 	CardType    CardType
 	Points      int  // 基础牌 1-5；合成后点数由加法/乘法决定，无硬性上限
 	IsHidden    bool // 点数对对手隐藏（场地效果触发）
@@ -142,7 +158,7 @@ func (c *Card) String() string {
 	if c.Synthesized {
 		suffix += "[已合成]"
 	}
-	return fmt.Sprintf("[%s·%s %d点%s]", c.SubFaction, c.CardType, c.Points, suffix)
+	return fmt.Sprintf("[%s·%s %d点%s]", c.Suit, c.CardType, c.Points, suffix)
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -158,12 +174,12 @@ func newCardID() string {
 }
 
 // New 创建一张新牌（主要由 Deck 调用）。
-func New(sf SubFaction, ct CardType, points int) *Card {
+func New(s Suit, ct CardType, points int) *Card {
 	return &Card{
-		ID:         newCardID(),
-		SubFaction: sf,
-		CardType:   ct,
-		Points:     clamp(points, MinPoints, MaxPoints),
+		ID:       newCardID(),
+		Suit:     s,
+		CardType: ct,
+		Points:   clamp(points, MinPoints, MaxPoints),
 	}
 }
 

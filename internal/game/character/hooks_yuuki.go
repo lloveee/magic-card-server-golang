@@ -2,14 +2,14 @@ package character
 
 func init() {
 	// 结城：封印的魔法少女。
-	// 四个封印分别对应四种派系的攻击牌，封印后该次伤害不可抵挡。
+	// 四个封印分别对应四种花色的攻击牌，封印后该次伤害不可抵挡。
 	// 四印全部封印后自动开启解放：每回合首次命中→20不可抵挡+后续命中→附加15恢复。
 	//
 	// ExtraState:
-	//   seal_dream       bool - 梦境封印（梦境派系攻击牌）
-	//   seal_illusion    bool - 虚幻封印（虚幻派系攻击牌）
-	//   seal_reconstruct bool - 重组封印（重组派系攻击牌）
-	//   seal_cycle       bool - 轮回封印（轮回派系攻击牌）
+	//   seal_dream       bool - 红桃封印（红桃花色攻击牌）
+	//   seal_illusion    bool - 方片封印（方片花色攻击牌）
+	//   seal_reconstruct bool - 梅花封印（梅花花色攻击牌）
+	//   seal_cycle       bool - 黑桃封印（黑桃花色攻击牌）
 	//   lib_active       bool - 四印解放是否激活
 	//   first_hit_used   bool - 本回合首次命中是否已用
 
@@ -28,22 +28,22 @@ func init() {
 					return
 				}
 				switch faction {
-				case "梦境":
+				case "红桃":
 					if !esBool(es, "seal_dream", false) {
 						es["seal_dream"] = true
 						es["_seal_triggered"] = "dream"
 					}
-				case "虚幻":
+				case "方片":
 					if !esBool(es, "seal_illusion", false) {
 						es["seal_illusion"] = true
 						es["_seal_triggered"] = "illusion"
 					}
-				case "重组":
+				case "梅花":
 					if !esBool(es, "seal_reconstruct", false) {
 						es["seal_reconstruct"] = true
 						es["_seal_triggered"] = "reconstruct"
 					}
-				case "轮回":
+				case "黑桃":
 					if !esBool(es, "seal_cycle", false) {
 						es["seal_cycle"] = true
 						es["_seal_triggered"] = "cycle"

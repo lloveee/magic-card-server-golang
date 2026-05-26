@@ -278,7 +278,7 @@ func (e *Engine) runDraw() {
 	e.broadcastPhaseChange()
 	e.doDraw()
 
-	// 虚幻之境·虚：本回合补入的牌对对手隐藏
+	// 方片之境·虚：本回合补入的牌对对手隐藏
 	if e.state.FieldEffect != nil && e.state.FieldEffect.HideDrawnCards {
 		for _, p := range e.state.Players {
 			for _, sc := range p.Hand.HandSlottedCards() {
@@ -507,13 +507,13 @@ func (e *Engine) handlePlayCard(seat int, payload []byte) {
 	e.room.Broadcast(protocol.MsgCardPlayedEv, protocol.MustEncode(protocol.CardPlayedEv{
 		PlayerSeat: seat,
 		CardType:   c.CardType.String(),
-		Faction:    c.SubFaction.String(),
+		Suit:       c.Suit.Symbol(),
 		Points:     &c.Points,
 	}))
 
 	// 钩子：OnCardPlayed（在 AllCardsAsAttack 转换前，看到原始牌型）
 	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.OnCardPlayed != nil {
-		p.Char.Def.Hooks.OnCardPlayed(c.CardType.String(), c.Points, c.SubFaction.String(), p.Char.ExtraState)
+		p.Char.Def.Hooks.OnCardPlayed(c.CardType.String(), c.Points, c.Suit.String(), p.Char.ExtraState)
 	}
 
 	// 万能者被动：所有牌均视为攻击牌（优先级高于场地效果）
@@ -730,7 +730,7 @@ func (e *Engine) handleDefenseAction(seat int, payload []byte) {
 	e.room.Broadcast(protocol.MsgCardPlayedEv, protocol.MustEncode(protocol.CardPlayedEv{
 		PlayerSeat: seat,
 		CardType:   defCard.CardType.String(),
-		Faction:    defCard.SubFaction.String(),
+		Suit:       defCard.Suit.Symbol(),
 		Points:     &defCard.Points,
 	}))
 

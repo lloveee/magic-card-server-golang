@@ -10,14 +10,14 @@ import "math/rand"
 type EffectID string
 
 const (
-	EffectClear        EffectID = "clear"         // 空旷之地：无效果
-	EffectIllusionReal EffectID = "illusion_real" // 虚幻之境·实：虚幻牌合成上限提升至 7
-	EffectIllusionVoid EffectID = "illusion_void" // 虚幻之境·虚：本回合补入的牌点数对对手隐藏
-	EffectReincBase    EffectID = "reinc_base"    // 轮回之境·实：轮回牌参与合成时结果 = 轮回牌自身点数
-	EffectReincOther   EffectID = "reinc_other"   // 轮回之境·虚：轮回牌参与合成时结果 = 另一张牌的点数
-	EffectChaos        EffectID = "chaos"         // 混沌之域：允许同功能牌型合成
-	EffectEcho         EffectID = "echo"          // 回响之地：攻击牌伤害 +1
-	EffectProtect      EffectID = "protect"       // 守护之光：濒死玩家每轮扣血从 30 减少至 15
+	EffectClear       EffectID = "clear"        // 空旷之地：无效果
+	EffectDiamondReal EffectID = "diamond_real" // 方片之境·实：方片花色牌合成上限提升至 7
+	EffectDiamondVoid EffectID = "diamond_void" // 方片之境·虚：本回合补入的牌点数对对手隐藏
+	EffectSpadeReal   EffectID = "spade_real"   // 黑桃之境·实：黑桃牌参与合成时结果 = 黑桃牌自身点数
+	EffectSpadeVoid   EffectID = "spade_void"   // 黑桃之境·虚：黑桃牌参与合成时结果 = 另一张牌的点数
+	EffectChaos       EffectID = "chaos"        // 混沌之域：允许同功能牌型合成
+	EffectEcho        EffectID = "echo"         // 回响之地：攻击牌伤害 +1
+	EffectProtect     EffectID = "protect"      // 守护之光：濒死玩家每轮扣血从 30 减少至 15
 )
 
 // ReincarnHint 镜像 card.ReincarnationRule，避免循环导入。
@@ -26,8 +26,8 @@ type ReincarnHint int8
 
 const (
 	ReincNormal  ReincarnHint = 0 // 标准规则
-	ReincAsBase  ReincarnHint = 1 // 轮回之境·实
-	ReincAsOther ReincarnHint = 2 // 轮回之境·虚
+	ReincAsBase  ReincarnHint = 1 // 黑桃之境·实
+	ReincAsOther ReincarnHint = 2 // 黑桃之境·虚
 )
 
 // FieldEffect 描述一种场地效果对游戏规则的所有影响。
@@ -40,11 +40,11 @@ type FieldEffect struct {
 	Name string // 显示名称，直接发给客户端
 
 	// ── 合成相关 ─────────────────────────────────────────────────
-	// IllusionBonus：虚幻牌合成上限提升至 7（card.MaxPointsWithField）
+	// IllusionBonus：方片花色牌合成上限提升至 7（card.MaxPointsWithField）
 	IllusionBonus bool
 	// AllowSameType：允许同功能牌型合成（跳过 ErrSameCardType 检查）
 	AllowSameType bool
-	// ReincarnRule：控制轮回牌的合成点数计算方式
+	// ReincarnRule：控制黑桃牌的合成点数计算方式
 	ReincarnRule ReincarnHint
 
 	// ── 手牌相关 ─────────────────────────────────────────────────
@@ -83,28 +83,28 @@ var Pool = []*FieldEffect{
 		// 无任何修改——提供"无效果"回合，给玩家喘息机会
 	},
 	{
-		ID:            EffectIllusionReal,
-		Name:          "虚幻之境·实",
+		ID:            EffectDiamondReal,
+		Name:          "方片之境·实",
 		IllusionBonus: true,
-		// 虚幻子系牌合成上限从 5 突破至 7，鼓励虚幻牌合成策略
+		// 方片花色牌合成上限从 5 突破至 7，鼓励方片牌合成策略
 	},
 	{
-		ID:             EffectIllusionVoid,
-		Name:           "虚幻之境·虚",
+		ID:             EffectDiamondVoid,
+		Name:           "方片之境·虚",
 		HideDrawnCards: true,
 		// 本回合补入的牌对对手隐藏，增加信息不对称
 	},
 	{
-		ID:           EffectReincBase,
-		Name:         "轮回之境·实",
+		ID:           EffectSpadeReal,
+		Name:         "黑桃之境·实",
 		ReincarnRule: ReincAsBase,
-		// 轮回牌参与合成时，结果点数 = 轮回牌自身点数（稳定输出）
+		// 黑桃牌参与合成时，结果点数 = 黑桃牌自身点数（稳定输出）
 	},
 	{
-		ID:           EffectReincOther,
-		Name:         "轮回之境·虚",
+		ID:           EffectSpadeVoid,
+		Name:         "黑桃之境·虚",
 		ReincarnRule: ReincAsOther,
-		// 轮回牌参与合成时，结果点数 = 另一张牌点数（牺牲轮回牌保留材料）
+		// 黑桃牌参与合成时，结果点数 = 另一张牌点数（牺牲黑桃牌保留材料）
 	},
 	{
 		ID:            EffectChaos,

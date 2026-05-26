@@ -4,23 +4,23 @@
     "name": "空旷之地"
   },
   {
-    "id": "illusion_real",
+    "id": "diamond_real",
     "illusion_bonus": true,
-    "name": "虚幻之境·实"
+    "name": "方片之境·实"
   },
   {
     "hide_drawn_cards": true,
-    "id": "illusion_void",
-    "name": "虚幻之境·虚"
+    "id": "diamond_void",
+    "name": "方片之境·虚"
   },
   {
-    "id": "reinc_base",
-    "name": "轮回之境·实",
+    "id": "spade_real",
+    "name": "黑桃之境·实",
     "reincarn_rule": 1
   },
   {
-    "id": "reinc_other",
-    "name": "轮回之境·虚",
+    "id": "spade_void",
+    "name": "黑桃之境·虚",
     "reincarn_rule": 2
   },
   {

@@ -15,7 +15,7 @@ package protocol
 //
 //  特殊例外（通过单独的事件消息处理，不在此文件）：
 //    - 镜换者一级技能：本阶段内可见对手最高攻击牌点数（MsgSkillUsedEv 附带）
-//    - 虚幻之境·虚场地效果：对手的非虚幻牌点数本阶段隐藏
+//    - 方片之境·虚场地效果：对手的非方片牌点数本阶段隐藏
 // ════════════════════════════════════════════════════════════════
 
 // PendingAttackView 告知客户端当前行动阶段有一次待防御的攻击。
@@ -78,11 +78,11 @@ type OpponentView struct {
 // 不会因为忘记检查而把 -1 当成真实点数用于计算。
 //
 // 什么时候 Points 为 nil？
-//   - 虚幻之境·虚 场地效果下，自己手中的非虚幻牌（对手视角的隐藏）
-//   - 虚幻之境·实 场地效果下，新抽到的虚幻牌（结算时才揭示，+2 后最高 7 点）
+//   - 方片之境·虚 场地效果下，自己手中的非方片牌（对手视角的隐藏）
+//   - 方片之境·实 场地效果下，新抽到的方片牌（结算时才揭示，+2 后最高 7 点）
 type CardView struct {
 	Slot      int    `json:"slot"`
-	Faction   string `json:"faction"`   // "梦幻" or "重回"
+	Suit      string `json:"suit"`      // 花色符号："♥" / "♦" / "♣" / "♠"
 	CardType  string `json:"card_type"` // "攻击" or "技能" or "能耗"
 	Points    *int   `json:"points"`    // nil = 点数隐藏（显示用，含角色被动加成）
 	RawPoints *int   `json:"raw_points,omitempty"` // 合成用原始点数（无被动修正），与 Points 不同时才发送
