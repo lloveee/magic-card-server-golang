@@ -417,6 +417,13 @@ func (e *Engine) broadcastTurnTimer(activeSeat, secondsLeft int) {
 
 // processAction 处理一条玩家行动消息，所有操作在此串行执行。
 func (e *Engine) processAction(act action) {
+	// 投降：任何时机均可触发（含对手回合、防御窗口期间），
+	// 绕过下面的"是否轮到你"/"是否已结束行动"/"是否需先防御"等校验。
+	if act.MsgID == protocol.MsgSurrenderReq {
+		e.handleSurrender(act.Seat)
+		return
+	}
+
 	// 防御窗口期间：即使防御方已宣告结束行动，仍必须响应来袭攻击
 	if e.state.PendingAttack != nil {
 		defSeat := 1 - e.state.PendingAttack.AttackerSeat
@@ -1005,6 +1012,30 @@ func (e *Engine) triggerDeath(loseSeat int) {
 		WinnerSeat: winner,
 		Reason:     "hp_zero",
 	}))
+}
+
+// handleSurrender 处理 MsgSurrenderReq：投降方判负，对手立即获胜。
+// 客户端已完成二次确认，服务端不再做额外校验。
+// 若游戏已结束（isOver），静默忽略（幂等），避免覆盖既有胜者。
+func (e *Engine) handleSurrender(seat int) {
+	if e.state.isOver() {
+		slog.Info("surrender ignored, game already over",
+			"gameID", e.state.GameID, "seat", seat, "winner", e.state.Winner)
+		return
+	}
+	winner := 1 - seat
+	e.state.Phase = PhaseGameOver
+	e.state.Winner = winner
+
+	slog.Info("surrender", "loser_seat", seat, "winner_seat", winner)
+	e.room.Broadcast(protocol.MsgGameOverEv, protocol.MustEncode(protocol.GameOverEv{
+		WinnerSeat: winner,
+		Reason:     "surrender",
+	}))
+	// 停止引擎主循环：与 hp_zero 路径一致（state.isOver 在 run/runAction 中
+	// 被检查后退出 goroutine），同时显式 cancel ctx 让正在 select 的 actionCh
+	// 立刻醒来收尾。
+	e.Stop()
 }
 
 // runCleanup 清场阶段，返回 true 表示游戏已结束。
