@@ -18,6 +18,26 @@ func init() {
 			MaxHandSize: func(_ map[string]any, _ int) int {
 				return 15
 			},
+			BuildExtraInfo: func(es map[string]any) map[string]any {
+				eyes := rokkaGetEyes(es)
+				idx := esInt(es, "rokka_activation_idx", 0)
+				return map[string]any{
+					"rokka_eyes_points":    eyes[:],
+					"rokka_activation_idx": idx,
+					"rokka_lit_eyes":       rokkaGetLit(es),
+					"rokka_locked":         idx >= 6,
+				}
+			},
+			BuildPublicExtra: func(es map[string]any) map[string]any {
+				eyes := rokkaGetEyes(es)
+				idx := esInt(es, "rokka_activation_idx", 0)
+				return map[string]any{
+					"rokka_eyes_points":    eyes[:],
+					"rokka_activation_idx": idx,
+					"rokka_lit_eyes":       rokkaGetLit(es),
+					"rokka_locked":         idx >= 6,
+				}
+			},
 			PreUseSkillCheck: func(pts int, es map[string]any) error {
 				idx := esInt(es, "rokka_activation_idx", 0)
 				if idx < 6 {

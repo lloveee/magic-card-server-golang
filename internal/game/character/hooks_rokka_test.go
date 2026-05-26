@@ -116,3 +116,23 @@ func TestRokkaOther(t *testing.T) {
 		}
 	}
 }
+
+// TestRokkaBuildExtraInfo 验证客户端可见字段
+func TestRokkaBuildExtraInfo(t *testing.T) {
+	def := MustGet("rokka")
+	if def.Hooks.BuildExtraInfo == nil {
+		t.Fatal("rokka must have BuildExtraInfo")
+	}
+	es := map[string]any{
+		"rokka_eyes_points":    [6]int{3, 5, 2, 4, 2, 1},
+		"rokka_activation_idx": 6,
+		"rokka_lit_eyes":       []int{1, 3},
+	}
+	info := def.Hooks.BuildExtraInfo(es)
+	if info["rokka_activation_idx"] != 6 {
+		t.Errorf("activation_idx=%v", info["rokka_activation_idx"])
+	}
+	if !info["rokka_locked"].(bool) {
+		t.Error("locked must be true")
+	}
+}
