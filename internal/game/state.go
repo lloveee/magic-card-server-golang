@@ -107,10 +107,17 @@ func (p *PlayerState) drawCards() {
 			maxSlots = n
 		}
 	}
+	// 记录基础补牌前的手牌数：BonusFillDraw 的"奖励"语义是奖励本回合保留下来的牌，
+	// 若上回合手牌已全部清空（如蘇芳把基础 4 张全放进合成区），就没有"保留"可言，
+	// 不应再额外 +4，避免出现下回合突然变 8 张的 bug。
+	preFillCount := p.Hand.HandCount()
 	p.Hand.Fill(p.Deck, maxSlots)
 	// 钩子：BonusFillDraw（基础补牌完成后额外抽牌，蘇芳：上回合跳过清场后 +4）
+	// 仍然调用钩子以消费内部 flag（如 suou_skip_pending），但若 preFillCount == 0
+	// 则丢弃返回值不实际加抽。
 	if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.BonusFillDraw != nil {
-		if extra := p.Char.Def.Hooks.BonusFillDraw(p.Char.ExtraState); extra > 0 {
+		extra := p.Char.Def.Hooks.BonusFillDraw(p.Char.ExtraState)
+		if extra > 0 && preFillCount > 0 {
 			p.Hand.DrawIntoHand(p.Deck, extra)
 		}
 	}
