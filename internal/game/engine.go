@@ -619,15 +619,39 @@ func (e *Engine) handlePlayCard(seat int, payload []byte) {
 		e.broadcastState("attack pending, awaiting defense")
 
 	case card.TypeEnergy:
-		// 能耗牌：转化为能量
-		gained := c.Points
-		e.gainEnergy(seat, gained)
-		slog.Info("energy gained", "seat", seat, "gained", gained, "total", p.Energy)
+		// 钩子前置校验：六華初始化阶段拒绝重复点数能耗牌。
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.PreUseEnergyCheck != nil {
+			if err := p.Char.Def.Hooks.PreUseEnergyCheck(c.Points, p.Char.ExtraState); err != nil {
+				// 把牌放回原槽位（手牌区精确槽位 / 合成区任意空槽）。
+				switch req.Zone {
+				case "hand":
+					_ = p.Hand.PlaceHand(req.Slot, c)
+				case "synth":
+					_ = p.Hand.PutSynth(c)
+				}
+				e.sendError(seat, protocol.ErrCodeInvalidPhase, err.Error())
+				e.sendStateTo(seat, "energy card rejected")
+				return
+			}
+		}
+		// 钩子覆盖：六華初始化阶段消耗能耗牌定义眼位，不产生能量。
+		handled := false
+		if p.Char != nil && p.Char.Def.Hooks != nil && p.Char.Def.Hooks.UseEnergyOverride != nil {
+			handled = p.Char.Def.Hooks.UseEnergyOverride(c.Points, p.Char.ExtraState)
+		}
+		if !handled {
+			// 能耗牌默认行为：转化为能量
+			gained := c.Points
+			e.gainEnergy(seat, gained)
+			slog.Info("energy gained", "seat", seat, "gained", gained, "total", p.Energy)
+		} else {
+			slog.Info("energy card consumed by hook", "seat", seat, "points", c.Points)
+		}
 		e.sendPlayerStatus(seat)
 		e.sendStateTo(seat, "energy card played") // 更新手牌区（移除已打出的能耗牌）
 
 		// 能量达到解放阈值时通知
-		if p.Energy >= p.LibThreshold {
+		if !handled && p.Energy >= p.LibThreshold {
 			slog.Info("liberation threshold reached", "seat", seat, "energy", p.Energy)
 		}
 

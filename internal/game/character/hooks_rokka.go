@@ -6,7 +6,8 @@ import (
 )
 
 func init() {
-	// 六華：六角大阵——按技能牌使用顺序激活六眼，激活后凭点数匹配点亮三眼触发效果。
+	// 六華：六角大阵——按能耗牌使用顺序依次定义六眼（点数必须互不相同），
+	// 六眼集齐后用技能牌点亮三眼即触发几何结算效果。
 	//
 	// ExtraState:
 	//   rokka_eyes_points [6]int   — 六眼点数（顺时针，下标 0=正上）
@@ -38,10 +39,38 @@ func init() {
 					"rokka_locked":         idx >= 6,
 				}
 			},
+			// 初始化阶段（idx<6）：能耗牌点数不得与已定义眼位重复。
+			PreUseEnergyCheck: func(pts int, es map[string]any) error {
+				idx := esInt(es, "rokka_activation_idx", 0)
+				if idx >= 6 {
+					return nil // 大阵已锁定，能耗牌恢复正常能量增益。
+				}
+				eyes := rokkaGetEyes(es)
+				for i := 0; i < idx; i++ {
+					if eyes[i] == pts {
+						return fmt.Errorf("六華：点数 %d 已被第 %d 眼占用，请使用其他点数的能耗牌", pts, i+1)
+					}
+				}
+				return nil
+			},
+			// 初始化阶段（idx<6）：消耗能耗牌点数定义本次眼位，不产生能量。
+			// 大阵锁定后（idx==6）返回 false，让引擎按默认能量增益处理。
+			UseEnergyOverride: func(pts int, es map[string]any) bool {
+				idx := esInt(es, "rokka_activation_idx", 0)
+				if idx >= 6 {
+					return false
+				}
+				eyes := rokkaGetEyes(es)
+				eyes[idx] = pts
+				es["rokka_eyes_points"] = eyes
+				es["rokka_activation_idx"] = idx + 1
+				return true
+			},
+			// 技能牌只能在大阵锁定后使用：用于点亮眼位，结算几何效果。
 			PreUseSkillCheck: func(pts int, es map[string]any) error {
 				idx := esInt(es, "rokka_activation_idx", 0)
 				if idx < 6 {
-					return nil
+					return fmt.Errorf("六華大阵未初始化（已定义 %d/6 眼），请先使用能耗牌定义眼位", idx)
 				}
 				eyes := rokkaGetEyes(es)
 				lit := rokkaGetLit(es)
@@ -53,11 +82,9 @@ func init() {
 			UseSkillOverride: func(pts int, es map[string]any) (*SkillResult, int, bool) {
 				idx := esInt(es, "rokka_activation_idx", 0)
 				if idx < 6 {
-					eyes := rokkaGetEyes(es)
-					eyes[idx] = pts
-					es["rokka_eyes_points"] = eyes
-					es["rokka_activation_idx"] = idx + 1
-					return &SkillResult{Desc: "六華大阵：眼位定义"}, 0, true
+					// 理论上 PreUseSkillCheck 已拦截；此处安全兜底，返回 not handled
+					// 让引擎走默认技能路径（无角色默认技能则无效果）。
+					return nil, 0, false
 				}
 				eyes := rokkaGetEyes(es)
 				lit := rokkaGetLit(es)

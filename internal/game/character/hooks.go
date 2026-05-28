@@ -94,8 +94,18 @@ type CharHooks struct {
 
 	// PreUseSkillCheck 在技能牌取出后、UseSkill 调用前进行前置校验。
 	// 返回非 nil error 时引擎拒绝这次出牌：将牌放回原槽位，并把错误消息发给玩家。
-	// 用途：节律者要求本回合每次技能点数不得低于上一次。
+	// 用途：节律者要求本回合每次技能点数不得低于上一次；六華要求大阵初始化完成后才能用技能牌。
 	PreUseSkillCheck func(cardPoints int, es map[string]any) error
+
+	// PreUseEnergyCheck 在能耗牌取出后、转化为能量前进行前置校验。
+	// 返回非 nil error 时引擎拒绝出牌：将牌放回原槽位，并把错误消息发给玩家。
+	// 用途：六華在大阵初始化阶段要求能耗牌点数互不相同（每个眼位必须唯一）。
+	PreUseEnergyCheck func(cardPoints int, es map[string]any) error
+
+	// UseEnergyOverride 替换默认的能耗牌结算逻辑。返回 handled=true 表示已自行处理
+	// （引擎跳过默认 gainEnergy）；handled=false 时按默认逻辑按牌面点数增加能量。
+	// 用途：六華大阵初始化阶段消耗能耗牌点数定义眼位，本身不再产生能量。
+	UseEnergyOverride func(cardPoints int, es map[string]any) (handled bool)
 
 	// MaxHandSize 用于"技能内抽牌"的回合内上限校验（如律花：手牌上限=能量值）。
 	// 返回值会被引擎 clamp 到 [1, HandZoneSize]；返回 0 表示沿用引擎默认（HandZoneSize 或濒死 SafeZoneSize）。
