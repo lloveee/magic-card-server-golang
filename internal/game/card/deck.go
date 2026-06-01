@@ -60,12 +60,12 @@ func (d *Deck) Seed() int64 {
 }
 
 // Draw 从牌堆取一张随机牌。
-// 防御牌概率 1/6，其余三种类型均分 5/6。
+// 防御牌概率 1/12，其余三种类型均分 11/12。
 func (d *Deck) Draw() *Card {
 	s := allSuits[d.rng.Intn(len(allSuits))]
-	// 防御牌概率 1/6
+	// 防御牌概率 1/12（每回合约补 8 张，期望约 0.67 张防御牌，~1.5 回合摸到一张）
 	var ct CardType
-	if d.rng.Intn(6) == 0 {
+	if d.rng.Intn(12) == 0 {
 		ct = TypeDefense
 	} else {
 		ct = allCardTypes[d.rng.Intn(len(allCardTypes))]

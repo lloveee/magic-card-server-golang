@@ -107,6 +107,12 @@ type CharHooks struct {
 	// 用途：六華大阵初始化阶段消耗能耗牌点数定义眼位，本身不再产生能量。
 	UseEnergyOverride func(cardPoints int, es map[string]any) (handled bool)
 
+	// ResolveFormationActivation 在六華「激活大阵」按钮触发时调用。
+	// 仅当大阵已点亮 3 眼（处于待激活态）时返回非 nil result 并清空点亮/待激活状态；
+	// 否则返回 (nil, errMsg) 表示当前无法激活（如尚未集齐三眼），引擎据此回错给玩家。
+	// 引擎在调用本钩子并拿到 result 后，自行弃置玩家一张手牌作为激活成本（纯触发，不结算该牌效果）。
+	ResolveFormationActivation func(es map[string]any) (result *SkillResult, errMsg string)
+
 	// MaxHandSize 用于"技能内抽牌"的回合内上限校验（如律花：手牌上限=能量值）。
 	// 返回值会被引擎 clamp 到 [1, HandZoneSize]；返回 0 表示沿用引擎默认（HandZoneSize 或濒死 SafeZoneSize）。
 	// 引擎传入当前能量值，便于实现"手牌上限=能量"等动态被动。
