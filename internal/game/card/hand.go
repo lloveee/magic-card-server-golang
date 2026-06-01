@@ -98,6 +98,19 @@ func (h *HandZone) HandCount() int {
 	return count
 }
 
+// DiscardArbitrary 移除并返回手牌区的一张牌（取最靠前的非空槽位）。
+// 用作六華「激活大阵」的弃牌成本——弃哪张对玩法无影响，故取首张即可。
+// 手牌区为空时返回 nil。
+func (h *HandZone) DiscardArbitrary() *Card {
+	for i, c := range h.hand {
+		if c != nil {
+			h.hand[i] = nil
+			return c
+		}
+	}
+	return nil
+}
+
 // AllHandCards 返回手牌区所有非空牌的切片（保留槽位顺序）。
 // 用于向客户端发送手牌视图。
 func (h *HandZone) AllHandCards() []*Card {

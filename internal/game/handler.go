@@ -42,6 +42,8 @@ func (h *Handler) RegisterAll(r *network.Router) {
 		protocol.MsgEndActionReq,
 		protocol.MsgDefenseReq,
 		protocol.MsgSurrenderReq,
+		protocol.MsgReviveReq,        // 蘇芳：复活对话框内提交两张牌（此前漏注册，导致确认无响应）
+		protocol.MsgRokkaActivateReq, // 六華：集齐三眼后点击激活大阵
 	}
 	for _, msgID := range inGameMsgs {
 		id := msgID // 闭包捕获副本，避免循环变量问题（Go 1.22 已修复，显式保留更清晰）

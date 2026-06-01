@@ -6,104 +6,123 @@ import (
 )
 
 func init() {
-	// 六華：六角大阵——按能耗牌使用顺序依次定义六眼（点数必须互不相同），
-	// 六眼集齐后用技能牌点亮三眼即触发几何结算效果。
+	// 六華：六角大阵
+	//
+	// 玩法（本版改动）：
+	//   1. 预定：用任意牌（能耗牌或技能牌，只看点数）依次为六眼盖印点数；
+	//      点数可重复（牌面点数仅 1~5 共 5 种，6 眼必然出现重复），无类型/唯一性要求。
+	//   2. 锁定：存满 6 眼后大阵锁定（activation_idx==6）。
+	//   3. 点亮：再用任意牌（能耗/技能，按点数匹配某未点亮眼）点亮眼位。
+	//   4. 待激活：点亮第 3 眼后进入「待激活」态（不立即结算），
+	//      玩家点击「激活大阵」按钮、弃置任意一张手牌（纯触发，不结算该牌效果）后，
+	//      按 3 个点亮眼位的几何形状结算效果，并清空点亮状态以便重新循环。
 	//
 	// ExtraState:
-	//   rokka_eyes_points [6]int   — 六眼点数（顺时针，下标 0=正上）
-	//   rokka_activation_idx int   — 已存入眼数 (0..6)；达 6 时大阵锁定
-	//   rokka_lit_eyes []int       — 当前已点亮眼下标（达 3 时清空）
+	//   rokka_eyes_points [6]int        — 六眼点数（顺时针，下标 0=正上）
+	//   rokka_activation_idx int        — 已存入眼数 (0..6)；达 6 时大阵锁定
+	//   rokka_lit_eyes []int            — 当前已点亮眼下标（达 3 进入待激活；激活后清空）
+	//   rokka_pending_activation bool   — 已集齐 3 眼，等待玩家点击激活按钮
 	registry["rokka"] = &CharDef{
 		ID: "rokka",
 		Hooks: &CharHooks{
 			MaxHandSize: func(_ map[string]any, _ int) int {
 				return 15
 			},
-			BuildExtraInfo: func(es map[string]any) map[string]any {
-				eyes := rokkaGetEyes(es)
-				idx := esInt(es, "rokka_activation_idx", 0)
-				return map[string]any{
-					"rokka_eyes_points":    eyes[:],
-					"rokka_activation_idx": idx,
-					"rokka_lit_eyes":       rokkaGetLit(es),
-					"rokka_locked":         idx >= 6,
-				}
-			},
-			BuildPublicExtra: func(es map[string]any) map[string]any {
-				eyes := rokkaGetEyes(es)
-				idx := esInt(es, "rokka_activation_idx", 0)
-				return map[string]any{
-					"rokka_eyes_points":    eyes[:],
-					"rokka_activation_idx": idx,
-					"rokka_lit_eyes":       rokkaGetLit(es),
-					"rokka_locked":         idx >= 6,
-				}
-			},
-			// 初始化阶段（idx<6）：能耗牌点数不得与已定义眼位重复。
-			PreUseEnergyCheck: func(pts int, es map[string]any) error {
-				idx := esInt(es, "rokka_activation_idx", 0)
-				if idx >= 6 {
-					return nil // 大阵已锁定，能耗牌恢复正常能量增益。
-				}
-				eyes := rokkaGetEyes(es)
-				for i := 0; i < idx; i++ {
-					if eyes[i] == pts {
-						return fmt.Errorf("六華：点数 %d 已被第 %d 眼占用，请使用其他点数的能耗牌", pts, i+1)
-					}
-				}
-				return nil
-			},
-			// 初始化阶段（idx<6）：消耗能耗牌点数定义本次眼位，不产生能量。
-			// 大阵锁定后（idx==6）返回 false，让引擎按默认能量增益处理。
+			BuildExtraInfo:   rokkaBuildInfo,
+			BuildPublicExtra: rokkaBuildInfo,
+
+			// 能耗牌与技能牌共用同一套大阵校验/结算逻辑（只看点数）。
+			PreUseEnergyCheck: rokkaPreCheck,
+			PreUseSkillCheck:  rokkaPreCheck,
+
+			// 能耗牌：消耗为大阵动作（预定/点亮），不产生能量。
 			UseEnergyOverride: func(pts int, es map[string]any) bool {
-				idx := esInt(es, "rokka_activation_idx", 0)
-				if idx >= 6 {
-					return false
-				}
-				eyes := rokkaGetEyes(es)
-				eyes[idx] = pts
-				es["rokka_eyes_points"] = eyes
-				es["rokka_activation_idx"] = idx + 1
+				rokkaApply(pts, es)
 				return true
 			},
-			// 技能牌只能在大阵锁定后使用：用于点亮眼位，结算几何效果。
-			PreUseSkillCheck: func(pts int, es map[string]any) error {
-				idx := esInt(es, "rokka_activation_idx", 0)
-				if idx < 6 {
-					return fmt.Errorf("六華大阵未初始化（已定义 %d/6 眼），请先使用能耗牌定义眼位", idx)
-				}
-				eyes := rokkaGetEyes(es)
-				lit := rokkaGetLit(es)
-				if rokkaFindEye(eyes, lit, pts) < 0 {
-					return fmt.Errorf("六華：没有点数为 %d 的未点亮眼", pts)
-				}
-				return nil
-			},
+			// 技能牌：同样用于预定/点亮；几何结算延后到「激活大阵」按钮，
+			// 因此点亮本身不产生即时效果，只回展示文案。
 			UseSkillOverride: func(pts int, es map[string]any) (*SkillResult, int, bool) {
-				idx := esInt(es, "rokka_activation_idx", 0)
-				if idx < 6 {
-					// 理论上 PreUseSkillCheck 已拦截；此处安全兜底，返回 not handled
-					// 让引擎走默认技能路径（无角色默认技能则无效果）。
-					return nil, 0, false
+				desc := rokkaApply(pts, es)
+				return &SkillResult{Desc: desc}, 0, true
+			},
+
+			// 「激活大阵」按钮：仅待激活态可用，结算几何并清空点亮状态。
+			ResolveFormationActivation: func(es map[string]any) (*SkillResult, string) {
+				if !esBool(es, "rokka_pending_activation", false) {
+					return nil, "六華：大阵尚未集齐三眼，无法激活"
 				}
-				eyes := rokkaGetEyes(es)
 				lit := rokkaGetLit(es)
-				candidate := rokkaFindEye(eyes, lit, pts)
-				if candidate < 0 {
-					return &SkillResult{}, 0, true
-				}
-				lit = append(lit, candidate)
-				if len(lit) < 3 {
-					es["rokka_lit_eyes"] = lit
-					return &SkillResult{Desc: fmt.Sprintf("六華大阵：第 %d 眼点亮", len(lit))}, 0, true
-				}
-				es["rokka_lit_eyes"] = lit
 				result := rokkaEvaluateGeometry(lit)
 				es["rokka_lit_eyes"] = []int{}
-				return result, 0, true
+				es["rokka_pending_activation"] = false
+				return result, ""
 			},
 		},
 	}
+}
+
+// rokkaBuildInfo 构建发送给客户端（己方 BuildExtraInfo 与对手 BuildPublicExtra 共用）的大阵状态。
+func rokkaBuildInfo(es map[string]any) map[string]any {
+	eyes := rokkaGetEyes(es)
+	idx := esInt(es, "rokka_activation_idx", 0)
+	return map[string]any{
+		"rokka_eyes_points":        eyes[:],
+		"rokka_activation_idx":     idx,
+		"rokka_lit_eyes":           rokkaGetLit(es),
+		"rokka_locked":             idx >= 6,
+		"rokka_pending_activation": esBool(es, "rokka_pending_activation", false),
+	}
+}
+
+// rokkaPreCheck 校验一张牌（能耗或技能）能否参与大阵；不修改状态。
+//   - 初始化阶段(idx<6)：任意点数均可（用于预定眼位）。
+//   - 待激活态：拒绝出牌，提示先点击「激活大阵」按钮。
+//   - 锁定后(idx==6)：必须能点亮某个未点亮眼（点数匹配），否则拒绝并放回。
+func rokkaPreCheck(pts int, es map[string]any) error {
+	idx := esInt(es, "rokka_activation_idx", 0)
+	if idx < 6 {
+		return nil
+	}
+	if esBool(es, "rokka_pending_activation", false) {
+		return fmt.Errorf("六華：已集齐三眼，请点击「激活大阵」按钮弃牌触发")
+	}
+	eyes := rokkaGetEyes(es)
+	lit := rokkaGetLit(es)
+	if rokkaFindEye(eyes, lit, pts) < 0 {
+		return fmt.Errorf("六華：没有点数为 %d 的未点亮眼", pts)
+	}
+	return nil
+}
+
+// rokkaApply 执行预定/点亮（假定 rokkaPreCheck 已通过），返回用于展示的文案。
+func rokkaApply(pts int, es map[string]any) string {
+	idx := esInt(es, "rokka_activation_idx", 0)
+	if idx < 6 {
+		eyes := rokkaGetEyes(es)
+		eyes[idx] = pts
+		es["rokka_eyes_points"] = eyes
+		es["rokka_activation_idx"] = idx + 1
+		if idx+1 >= 6 {
+			return "六華大阵：六眼集齐，大阵锁定"
+		}
+		return fmt.Sprintf("六華大阵：第 %d 眼已预定（点数 %d）", idx+1, pts)
+	}
+
+	// 锁定后：点亮匹配点数的未点亮眼。
+	eyes := rokkaGetEyes(es)
+	lit := rokkaGetLit(es)
+	candidate := rokkaFindEye(eyes, lit, pts)
+	if candidate < 0 {
+		return "六華：无可点亮的眼" // 理论上 rokkaPreCheck 已拦截
+	}
+	lit = append(lit, candidate)
+	es["rokka_lit_eyes"] = lit
+	if len(lit) >= 3 {
+		es["rokka_pending_activation"] = true
+		return "六華大阵：三眼齐亮，请点击「激活大阵」弃牌触发"
+	}
+	return fmt.Sprintf("六華大阵：第 %d 眼点亮", len(lit))
 }
 
 // rokkaGetEyes 返回 ExtraState 中存储的六眼点数副本。

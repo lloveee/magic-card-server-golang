@@ -512,6 +512,8 @@ func (e *Engine) processAction(act action) {
 		e.handleUseSkill(act.Seat, act.Payload)
 	case protocol.MsgTriggerLibrateReq:
 		e.handleTriggerLiberate(act.Seat)
+	case protocol.MsgRokkaActivateReq:
+		e.handleRokkaActivate(act.Seat)
 	default:
 		slog.Warn("unknown action msgID in action phase", "msgID", act.MsgID)
 	}
@@ -1598,6 +1600,44 @@ func (e *Engine) handleUseSkill(seat int, payload []byte) {
 		return
 	}
 	e.broadcastState("skill used")
+}
+
+// handleRokkaActivate 处理 MsgRokkaActivateReq：六華集齐三眼后点击「激活大阵」。
+// 弃置任意一张手牌作为触发成本（纯触发，不结算该牌效果），再按几何形状结算大阵效果。
+func (e *Engine) handleRokkaActivate(seat int) {
+	p := e.state.Players[seat]
+	if p.Char == nil || p.Char.Def.Hooks == nil || p.Char.Def.Hooks.ResolveFormationActivation == nil {
+		e.sendError(seat, protocol.ErrCodeInvalidPhase, "当前角色没有可激活的大阵")
+		return
+	}
+	if p.Hand.HandCount() == 0 {
+		e.sendError(seat, protocol.ErrCodeInvalidPhase, "需要弃置一张手牌来激活大阵，但你手中无牌")
+		return
+	}
+	result, errMsg := p.Char.Def.Hooks.ResolveFormationActivation(p.Char.ExtraState)
+	if errMsg != "" {
+		e.sendError(seat, protocol.ErrCodeInvalidPhase, errMsg)
+		return
+	}
+
+	// 弃置任意一张手牌作为激活成本（纯触发，不结算该牌本身效果）。
+	if discarded := p.Hand.DiscardArbitrary(); discarded != nil {
+		slog.Info("rokka: discarded a card to activate formation", "seat", seat, "points", discarded.Points)
+	}
+	p.CharRevealed = true
+
+	charDisplayName := p.CharacterID
+	if def, ok := character.Get(p.CharacterID); ok {
+		charDisplayName = def.Name
+	}
+	e.room.Broadcast(protocol.MsgSkillUsedEv, protocol.MustEncode(protocol.SkillUsedEv{
+		PlayerSeat: seat,
+		Character:  charDisplayName,
+		SkillLevel: int(result.Tier),
+		Desc:       result.Desc,
+	}))
+	e.applySkillResult(seat, result)
+	e.broadcastState("rokka formation activated")
 }
 
 // handleTriggerLiberate 处理 MsgTriggerLibrateReq：手动触发解放技能。
